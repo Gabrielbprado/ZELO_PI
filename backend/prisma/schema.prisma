@@ -1,0 +1,297 @@
+// ZERO Marketplace — Prisma schema
+// Mercado local de serviços (encanador, eletricista, etc.)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  PROVIDER
+  ADMIN
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum BookingUrgency {
+  EMERGENCY
+  TODAY
+  THIS_WEEK
+  FLEXIBLE
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum NotificationType {
+  BOOKING
+  MESSAGE
+  REVIEW
+  PROMO
+  SYSTEM
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  phone        String?  @unique
+  passwordHash String
+  name         String
+  avatarHue    Int      @default(220)
+  city         String?
+  neighborhood String?
+  role         Role     @default(CLIENT)
+  isActive     Boolean  @default(true)
+  emailVerified Boolean @default(false)
+  failedLogins Int      @default(0)
+  lockedUntil  DateTime?
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  providerProfile  ProviderProfile?
+  refreshTokens    RefreshToken[]
+  bookingsAsClient Booking[]        @relation("ClientBookings")
+  reviewsWritten   Review[]         @relation("Author")
+  reviewsReceived  Review[]         @relation("Target")
+  messagesSent     Message[]        @relation("Sender")
+  messagesReceived Message[]        @relation("Receiver")
+  notifications    Notification[]
+  budgetEstimates  BudgetEstimate[]
+  auditLogs        AuditLog[]
+
+  @@index([city, neighborhood])
+}
+
+model ProviderProfile {
+  id          String     @id @default(uuid())
+  userId      String     @unique
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio         String?
+  yearsExp    Int        @default(0)
+  jobsDone    Int        @default(0)
+  ratingAvg   Float      @default(0)
+  ratingCount Int        @default(0)
+  kycStatus   KycStatus  @default(PENDING)
+  kycVerifiedAt DateTime?
+  documentCpf String?    @unique
+  available   Boolean    @default(true)
+  latitude    Float?
+  longitude   Float?
+  priceFrom   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  services   ProviderService[]
+  bookings   Booking[]
+  portfolio  PortfolioItem[]
+  categories ProviderCategory[]
+
+  @@index([available, ratingAvg])
+}
+
+model Category {
+  id        String   @id
+  name      String
+  iconKey   String
+  hue       Int      @default(220)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  providers ProviderCategory[]
+  services  ProviderService[]
+  bookings  Booking[]
+}
+
+model ProviderCategory {
+  providerId String
+  categoryId String
+  provider   ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  category   Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([providerId, categoryId])
+}
+
+model ProviderService {
+  id          String   @id @default(uuid())
+  providerId  String
+  categoryId  String
+  title       String
+  description String?
+  priceMin    Int
+  priceMax    Int?
+  unit        String   @default("servico")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  category Category        @relation(fields: [categoryId], references: [id])
+
+  @@index([providerId])
+}
+
+model PortfolioItem {
+  id         String   @id @default(uuid())
+  providerId String
+  caption    String?
+  hue        Int      @default(220)
+  createdAt  DateTime @default(now())
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+}
+
+model Booking {
+  id          String         @id @default(uuid())
+  clientId    String
+  providerId  String
+  categoryId  String
+  title       String
+  description String?
+  address     String
+  scheduledAt DateTime?
+  urgency     BookingUrgency @default(FLEXIBLE)
+  status      BookingStatus  @default(REQUESTED)
+  priceEstimate Int?
+  priceFinal  Int?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  completedAt DateTime?
+
+  client   User            @relation("ClientBookings", fields: [clientId], references: [id])
+  provider ProviderProfile @relation(fields: [providerId], references: [id])
+  category Category        @relation(fields: [categoryId], references: [id])
+  review   Review?
+  payment  Payment?
+  messages Message[]
+
+  @@index([clientId, status])
+  @@index([providerId, status])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique
+  authorId   String
+  targetId   String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  author  User    @relation("Author", fields: [authorId], references: [id])
+  target  User    @relation("Target", fields: [targetId], references: [id])
+
+  @@index([targetId])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  bookingId  String?
+  senderId   String
+  receiverId String
+  content    String
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  booking  Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  sender   User     @relation("Sender",  fields: [senderId],   references: [id])
+  receiver User     @relation("Receiver", fields: [receiverId], references: [id])
+
+  @@index([senderId, receiverId])
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  bookingId String        @unique
+  amount    Int
+  currency  String        @default("BRL")
+  method    String        @default("pix")
+  status    PaymentStatus @default(PENDING)
+  externalId String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  userAgent String?
+  ip        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model BudgetEstimate {
+  id         String   @id @default(uuid())
+  userId     String?
+  categoryId String
+  answers    Json
+  estimateMin Int
+  estimateMax Int
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
