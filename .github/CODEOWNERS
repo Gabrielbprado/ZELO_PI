@@ -1,0 +1,25 @@
+# CODEOWNERS — auto-assigns reviewers when a PR touches these paths.
+# Syntax: <pattern> <owner-1> <owner-2> ...
+# Order matters: the last matching pattern wins.
+
+# Default owner for everything
+*                       @Gabrielbprado
+
+# Backend
+/backend/               @Gabrielbprado
+/backend/prisma/        @Gabrielbprado
+/backend/src/services/  @Gabrielbprado
+/backend/src/errors/    @Gabrielbprado
+
+# Mobile
+/mobile/                @Gabrielbprado
+/mobile/src/contexts/   @Gabrielbprado
+/mobile/src/navigation/ @Gabrielbprado
+
+# Docs and governance
+/docs/                  @Gabrielbprado
+/.github/               @Gabrielbprado
+README.md               @Gabrielbprado
+CONTRIBUTING.md         @Gabrielbprado
+SECURITY.md             @Gabrielbprado
+LICENSE                 @Gabrielbprado
