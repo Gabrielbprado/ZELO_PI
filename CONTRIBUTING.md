@@ -17,15 +17,23 @@ By participating you agree to abide by our [Code of Conduct](./CODE_OF_CONDUCT.m
 2. Follow [`docs/SETUP.md`](./docs/SETUP.md) to install dependencies, set up
    PostgreSQL and configure environment variables (`backend/.env`,
    `mobile/app.json` extras).
-3. Create a feature branch off `main`:
+3. Create a feature branch off `develop` (**not** `main`):
 
    ```bash
+   git checkout develop
+   git pull --ff-only
    git checkout -b feat/<short-description>
    ```
 
+See [`docs/BRANCHING.md`](./docs/BRANCHING.md) for the full branching
+strategy, promotion flow and the rules enforced on GitHub.
+
 ---
 
-## Branching strategy
+## Branching strategy (summary)
+
+- `develop` — default branch, all feature branches start here.
+- `main`    — production-ready snapshot, only updated via PRs from `develop`.
 
 | Prefix       | Use for                                          |
 | ------------ | ------------------------------------------------ |
@@ -37,6 +45,10 @@ By participating you agree to abide by our [Code of Conduct](./CODE_OF_CONDUCT.m
 | `chore/`     | tooling, dependencies, build configuration       |
 
 Branches should be small and focused — one concern per PR.
+
+Direct pushes to `develop` and `main` are **blocked**. Every change
+goes through a pull request with at least one approving review (see
+[`docs/BRANCHING.md`](./docs/BRANCHING.md)).
 
 ---
 
