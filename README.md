@@ -133,6 +133,25 @@ Default seed credentials and full installation details live in
 
 ---
 
+## Continuous integration & deployment
+
+| Pipeline                                                                          | Trigger                              | Target                  |
+| --------------------------------------------------------------------------------- | ------------------------------------ | ----------------------- |
+| [`ci.yml`](./.github/workflows/ci.yml)                                            | push / PR to `develop` and `main`    | Typecheck + unit tests  |
+| [`sonarcloud.yml`](./.github/workflows/sonarcloud.yml)                            | push / PR to `develop` and `main`    | Code-quality analysis   |
+| [`deploy-backend.yml`](./.github/workflows/deploy-backend.yml)                    | push to `develop` (paths: `backend/**`) | Render web service   |
+| [`deploy-frontend.yml`](./.github/workflows/deploy-frontend.yml)                  | push to `develop` (paths: `mobile/**`)  | Vercel static deploy |
+
+Full setup walkthrough (secrets, blueprint, project-link instructions) lives
+in [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
+
+Branch protection enforces 1+ approving review, dismissal of stale reviews,
+linear history, and blocks force-pushes / deletions on both `develop` and
+`main`. The full rule set and promotion flow are documented in
+[`docs/BRANCHING.md`](./docs/BRANCHING.md).
+
+---
+
 ## Implemented screens (17)
 
 **From the original design (7)**
