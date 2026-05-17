@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "ZERO Marketplace",
+    "slug": "zero-marketplace",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "dev.zero.marketplace"
+    },
+    "android": {
+      "package": "dev.zero.marketplace"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "apiBaseUrl": "http://192.168.106.148:4000/api/v1"
+    },
+    "plugins": ["expo-secure-store"]
+  }
+}
