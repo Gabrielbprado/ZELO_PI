@@ -8,8 +8,11 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
 import * as messagesApi from '../api/messages';
+import { getRealtimeSocket, type RealtimeMessage } from '../api/realtime';
 import type { MessageItem } from '../types';
 import type { AppStackParamList } from '../navigation/types';
+
+const POLL_FALLBACK_MS = 8000;
 
 export default function ChatScreen() {
   const nav = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
@@ -26,7 +29,62 @@ export default function ChatScreen() {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
   }, [params.otherUserId]);
 
-  useEffect(() => { load(); const id = setInterval(load, 8000); return () => clearInterval(id); }, [load]);
+  // Live updates over WebSocket, with polling as a graceful fallback.
+  // On (re)connect we re-fetch the thread via REST so any messages that
+  // arrived while we were offline are replayed.
+  useEffect(() => {
+    load();
+
+    let pollId: ReturnType<typeof setInterval> | null = null;
+    let cancelled = false;
+    let socket: Awaited<ReturnType<typeof getRealtimeSocket>> | undefined;
+
+    const startPolling = () => {
+      if (pollId === null) pollId = setInterval(load, POLL_FALLBACK_MS);
+    };
+    const stopPolling = () => {
+      if (pollId !== null) {
+        clearInterval(pollId);
+        pollId = null;
+      }
+    };
+
+    const onIncoming = (msg: RealtimeMessage) => {
+      // Only append messages FROM the other participant — our own messages are
+      // already rendered optimistically and confirmed by the POST response.
+      if (msg.senderId !== params.otherUserId || msg.receiverId !== user?.id) return;
+      setMessages((m) => (m.some((it) => it.id === msg.id) ? m : [...m, msg]));
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    };
+    const onConnect = () => {
+      stopPolling();
+      load();
+    };
+    const onDrop = () => startPolling();
+
+    (async () => {
+      try {
+        socket = await getRealtimeSocket();
+        if (cancelled) return;
+        socket.on('message:new', onIncoming);
+        socket.on('connect', onConnect);
+        socket.on('disconnect', onDrop);
+        socket.on('connect_error', onDrop);
+        if (!socket.connected) startPolling();
+      } catch {
+        startPolling();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      stopPolling();
+      socket?.off('message:new', onIncoming);
+      socket?.off('connect', onConnect);
+      socket?.off('disconnect', onDrop);
+      socket?.off('connect_error', onDrop);
+    };
+  }, [load, params.otherUserId, user?.id]);
 
   const send = async () => {
     const content = text.trim();

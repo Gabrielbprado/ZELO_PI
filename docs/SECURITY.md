@@ -47,6 +47,21 @@ Lista das proteções aplicadas no backend e mobile, e quais testes automatizado
 - CORS com allowlist via `CORS_ORIGINS`
 - Testes: `tests/integration/security.test.ts`
 
+## Realtime (WebSocket / socket.io)
+- Canal montado em `/realtime` (separado do REST `/api/v1`), sobre o mesmo servidor HTTP
+- **Handshake autenticado**: a conexão exige um **access token JWT** válido, passado em
+  `auth.token` (preferido) ou no header `Authorization: Bearer …`. Sem token válido o
+  handshake é **rejeitado** (`unauthorized`) antes de qualquer evento
+- **Mesma allowlist de origem do REST**: o CORS do socket.io usa exatamente o
+  `CORS_ORIGINS`. Origens fora da lista têm o handshake recusado pelo navegador
+  (clientes não-browser, como os testes, não enviam header `Origin`)
+- **Isolamento por usuário**: cada conexão entra apenas na sala privada `user:<id>`
+  derivada do `sub` do token — um cliente nunca recebe eventos de terceiros
+- `message:new` é emitido somente para as salas do remetente e do destinatário
+- O token nunca é logado (mesma config de redact do Pino)
+- Testes: `tests/integration/realtime.test.ts` (rejeição sem token, entrega em tempo real,
+  replay via REST no reconnect)
+
 ## Anti-pollution
 - `hpp()` bloqueia duplicação de parâmetros (`?role=CLIENT&role=ADMIN`)
 
@@ -78,7 +93,8 @@ Lista das proteções aplicadas no backend e mobile, e quais testes automatizado
 - **PII**: o seed cria dados fictícios. Em prod, considerar pseudonimização de logs e LGPD-compliance.
 - **2FA**: UI prevista, lógica ainda não implementada. Roadmap: TOTP via `otplib`.
 - **Geolocalização**: latitude/longitude estão no schema mas não há validação de proximidade. Adicionar PostGIS quando for usar.
-- **WebSocket / real-time**: chat e notificações fazem polling. Para produção, mover para WS autenticado.
+- **WebSocket / real-time**: chat agora usa WebSocket autenticado (socket.io em `/realtime`)
+  com fallback automático para polling no mobile. Notificações ainda fazem polling.
 
 ## Como rodar a suíte de segurança
 

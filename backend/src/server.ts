@@ -1,11 +1,18 @@
+import { createServer } from 'http';
 import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './utils/logger';
+import { createRealtime, REALTIME_PATH } from './realtime/io';
 
 const app = createApp();
+const httpServer = createServer(app);
 
-const server = app.listen(env.PORT, () => {
+// Attach the JWT-authenticated socket.io layer to the same HTTP server.
+createRealtime(httpServer);
+
+const server = httpServer.listen(env.PORT, () => {
   logger.info(`ZERO API rodando em http://localhost:${env.PORT}`);
+  logger.info(`Realtime (WebSocket) em ws://localhost:${env.PORT}${REALTIME_PATH}`);
 });
 
 const shutdown = (signal: string) => {

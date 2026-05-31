@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import * as authApi from '../api/auth';
 import { tokenStore } from '../api/client';
+import { disconnectRealtime } from '../api/realtime';
 import type { User } from '../types';
 
 type RegisterInput = Parameters<typeof authApi.register>[0];
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    disconnectRealtime();
     await authApi.logout();
     setUser(null);
   }, []);
