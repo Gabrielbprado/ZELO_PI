@@ -43,6 +43,13 @@ PR promotes the integrated work — handy for tagging stable demos.
    - `JWT_REFRESH_SECRET` — ≥ 32 random chars, **different** from the access secret.
    - `CORS_ORIGINS` — comma-separated list including your Vercel URLs
      (e.g. `https://zelo.vercel.app,https://zelo-pr-*.vercel.app`).
+   - **Push notifications (Expo)** — all optional:
+     - `PUSH_ENABLED` — `true` (default) or `false` to silence push without
+       removing the wiring. Set to `false` in dev/preview to avoid sending.
+     - `EXPO_ACCESS_TOKEN` — only needed if your Expo project enforces the
+       *Enhanced push security* setting; otherwise leave unset.
+     - `EXPO_PUSH_API_URL` — defaults to `https://exp.host/--/api/v2/push/send`;
+       override only for testing against a mock.
 5. Open the service → **Settings → Deploy Hook** and copy the URL.
 6. In GitHub: **Settings → Secrets and variables → Actions → New repository
    secret** and add `RENDER_DEPLOY_HOOK_URL` with the URL from step 5.

@@ -45,6 +45,17 @@ export async function updateOwnProfile(userId: string, input: UpdateProfileInput
   });
 }
 
+/**
+ * Upsert (or clear) the Expo push token for a user. Passing `null` drops it —
+ * used on logout so a signed-out device stops receiving push.
+ */
+export async function setPushToken(userId: string, token: string | null): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { pushToken: token },
+  });
+}
+
 export async function changePassword(
   userId: string,
   currentPassword: string,

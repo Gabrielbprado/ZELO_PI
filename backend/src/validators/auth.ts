@@ -8,6 +8,7 @@ const TOKEN_MIN = 32;
 const TOKEN_MAX = 128;
 const CITY_MAX = 80;
 const AVATAR_HUE_MAX = 360;
+const PUSH_TOKEN_MAX = 255;
 
 const passwordField = z.string().min(PASSWORD_MIN_LENGTH, 'Senha muito curta').max(PASSWORD_MAX_LENGTH);
 const newPasswordField = passwordField; // alias for readability
@@ -71,5 +72,11 @@ export const updateProfileSchema = {
     city: z.string().trim().max(CITY_MAX).optional().or(z.literal('')),
     neighborhood: z.string().trim().max(CITY_MAX).optional().or(z.literal('')),
     avatarHue: z.number().int().min(0).max(AVATAR_HUE_MAX).optional(),
+  }),
+};
+
+export const pushTokenSchema = {
+  body: z.object({
+    token: z.string().trim().min(1).max(PUSH_TOKEN_MAX),
   }),
 };

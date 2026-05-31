@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, R
 import * as authApi from '../api/auth';
 import { tokenStore } from '../api/client';
 import { disconnectRealtime } from '../api/realtime';
+import { registerForPush, unregisterFromPush } from '../utils/push';
 import type { User } from '../types';
 
 type RegisterInput = Parameters<typeof authApi.register>[0];
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const me = await authApi.me();
     setUser(me);
+    void registerForPush();
   }, []);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const result = await authApi.login(email, password);
     setUser(result.user);
+    void registerForPush();
   }, []);
 
   const register = useCallback(
@@ -52,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     disconnectRealtime();
+    await unregisterFromPush();
     await authApi.logout();
     setUser(null);
   }, []);

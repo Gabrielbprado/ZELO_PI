@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma';
 import { ForbiddenError, NotFoundError } from '../errors';
 import { realtimeBus } from '../realtime/bus';
+import { pushToUser } from './notifications.service';
 
 export interface SendMessageInput {
   receiverId: string;
@@ -10,13 +11,17 @@ export interface SendMessageInput {
 
 const THREAD_MAX_MESSAGES = 200;
 const CONVERSATIONS_MAX = 50;
+const MESSAGE_PREVIEW_MAX = 120;
 
 export async function sendMessage(senderId: string, input: SendMessageInput) {
   if (input.receiverId === senderId) {
     throw new ForbiddenError('Não é possível enviar mensagem para você mesmo');
   }
 
-  const receiver = await prisma.user.findUnique({ where: { id: input.receiverId } });
+  const [receiver, sender] = await Promise.all([
+    prisma.user.findUnique({ where: { id: input.receiverId } }),
+    prisma.user.findUnique({ where: { id: senderId }, select: { name: true } }),
+  ]);
   if (!receiver) throw new NotFoundError('Destinatário não encontrado');
 
   if (input.bookingId) {
@@ -32,8 +37,17 @@ export async function sendMessage(senderId: string, input: SendMessageInput) {
     },
   });
 
-  // Push to any connected sockets. No-op when the realtime layer is absent.
+  // Push to any connected sockets in real time. No-op without the realtime layer.
   realtimeBus.emitMessageCreated(message);
+
+  // OS-level push for the offline/foreground case.
+  await pushToUser(input.receiverId, {
+    title: sender ? `Nova mensagem de ${sender.name}` : 'Nova mensagem',
+    body: input.content.length > MESSAGE_PREVIEW_MAX
+      ? `${input.content.slice(0, MESSAGE_PREVIEW_MAX)}…`
+      : input.content,
+    data: { type: 'MESSAGE', senderId, bookingId: input.bookingId ?? null },
+  });
 
   return message;
 }
