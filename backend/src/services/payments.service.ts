@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from '../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
+import { pushToUser } from './notifications.service';
 
 export type PaymentMethod = 'pix' | 'card';
 
@@ -60,16 +61,29 @@ export async function createPaymentForBooking(userId: string, input: CreatePayme
 export async function confirmPayment(userId: string, bookingId: string) {
   const payment = await prisma.payment.findUnique({
     where: { bookingId },
-    include: { booking: true },
+    include: { booking: { include: { provider: { select: { userId: true } } } } },
   });
   if (!payment) throw new NotFoundError('Pagamento não encontrado');
   if (payment.booking.clientId !== userId) throw new ForbiddenError('Acesso negado');
   if (payment.status === 'PAID') return payment;
 
-  return prisma.payment.update({
+  const updated = await prisma.payment.update({
     where: { id: payment.id },
     data: { status: 'PAID' },
   });
+
+  // Notify the provider that they got paid.
+  await pushToUser(payment.booking.provider.userId, {
+    title: 'Pagamento confirmado 💰',
+    body: `Você recebeu o pagamento de ${formatBRL(updated.amount)}.`,
+    data: { type: 'PAYMENT', bookingId, paymentId: updated.id },
+  });
+
+  return updated;
+}
+
+function formatBRL(amount: number): string {
+  return `R$ ${amount.toLocaleString('pt-BR')}`;
 }
 
 export async function getPaymentByBooking(userId: string, bookingId: string) {

@@ -13,3 +13,13 @@ export async function markAllRead(): Promise<void> {
 export async function markRead(id: string): Promise<void> {
   await api.post(`/notifications/${id}/read`);
 }
+
+/** Persist this device's Expo push token server-side. */
+export async function registerPushToken(token: string): Promise<void> {
+  await api.post('/users/me/push-token', { token });
+}
+
+/** Drop this device's push token server-side (on logout). */
+export async function deletePushToken(): Promise<void> {
+  await api.delete('/users/me/push-token');
+}

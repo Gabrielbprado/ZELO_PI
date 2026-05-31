@@ -2,6 +2,7 @@ import {
   changePassword,
   requestPasswordReset,
   resetPasswordWithToken,
+  setPushToken,
   updateOwnProfile,
 } from '../services/users.service';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -15,6 +16,18 @@ export const updateMe = asyncHandler(async (req, res) => {
 
 export const changeMyPassword = asyncHandler(async (req, res) => {
   await changePassword(req.user!.sub, req.body.currentPassword, req.body.newPassword);
+  res.status(HttpStatus.NO_CONTENT).end();
+});
+
+/** Upsert the caller's Expo push token (idempotent — safe to call on every login). */
+export const upsertPushToken = asyncHandler(async (req, res) => {
+  await setPushToken(req.user!.sub, req.body.token);
+  res.status(HttpStatus.NO_CONTENT).end();
+});
+
+/** Drop the caller's push token (called on logout before the session is cleared). */
+export const deletePushToken = asyncHandler(async (req, res) => {
+  await setPushToken(req.user!.sub, null);
   res.status(HttpStatus.NO_CONTENT).end();
 });
 

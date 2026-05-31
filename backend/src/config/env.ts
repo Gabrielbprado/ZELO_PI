@@ -14,6 +14,12 @@ const schema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(200),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
+  // Push notifications (Expo). Kill-switch defaults ON; set to 'false' to
+  // silence push in dev without removing the wiring. `z.coerce.boolean` is
+  // intentionally avoided — it would treat the string 'false' as truthy.
+  PUSH_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+  EXPO_PUSH_API_URL: z.string().url().default('https://exp.host/--/api/v2/push/send'),
+  EXPO_ACCESS_TOKEN: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

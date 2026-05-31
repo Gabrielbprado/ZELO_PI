@@ -1,6 +1,7 @@
 import { BookingStatus, Role } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
+import { pushToUser } from './notifications.service';
 
 export type Urgency = 'EMERGENCY' | 'TODAY' | 'THIS_WEEK' | 'FLEXIBLE';
 export type AllowedBookingStatus = 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
@@ -93,6 +94,21 @@ export async function updateBookingStatus(
     await prisma.providerProfile.update({
       where: { id: booking.providerId },
       data: { jobsDone: { increment: 1 } },
+    });
+  }
+
+  // Notify the client on the two highest-value transitions.
+  if (status === 'ACCEPTED') {
+    await pushToUser(booking.clientId, {
+      title: 'Reserva aceita ✅',
+      body: `${updated.title} foi aceito pelo profissional.`,
+      data: { type: 'BOOKING', bookingId: updated.id, status },
+    });
+  } else if (status === 'COMPLETED') {
+    await pushToUser(booking.clientId, {
+      title: 'Serviço concluído 🎉',
+      body: `${updated.title} foi marcado como concluído.`,
+      data: { type: 'BOOKING', bookingId: updated.id, status },
     });
   }
 
