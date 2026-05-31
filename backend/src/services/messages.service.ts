@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma';
 import { ForbiddenError, NotFoundError } from '../errors';
+import { realtimeBus } from '../realtime/bus';
 
 export interface SendMessageInput {
   receiverId: string;
@@ -22,7 +23,7 @@ export async function sendMessage(senderId: string, input: SendMessageInput) {
     await assertParticipatesInBooking(input.bookingId, senderId, input.receiverId);
   }
 
-  return prisma.message.create({
+  const message = await prisma.message.create({
     data: {
       senderId,
       receiverId: input.receiverId,
@@ -30,6 +31,11 @@ export async function sendMessage(senderId: string, input: SendMessageInput) {
       content: input.content,
     },
   });
+
+  // Push to any connected sockets. No-op when the realtime layer is absent.
+  realtimeBus.emitMessageCreated(message);
+
+  return message;
 }
 
 async function assertParticipatesInBooking(
