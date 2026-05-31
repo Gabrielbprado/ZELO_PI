@@ -100,8 +100,10 @@ model ProviderProfile {
   kycVerifiedAt DateTime?
   documentCpf String?    @unique
   available   Boolean    @default(true)
-  latitude    Float?
-  longitude   Float?
+  // Real geolocation as a PostGIS geography point (SRID 4326).
+  // Unsupported by Prisma Client — read/written via raw SQL (ST_*) helpers.
+  // Replaces the former `latitude`/`longitude` float columns.
+  location    Unsupported("geography(Point, 4326)")?
   priceFrom   Int        @default(0)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt

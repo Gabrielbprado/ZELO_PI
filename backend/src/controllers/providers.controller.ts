@@ -8,15 +8,30 @@ const DEFAULT_PER_PAGE = 20;
 const DEFAULT_SORT: ProviderSort = 'rating';
 
 export const list = asyncHandler(async (req, res) => {
-  const q = req.query as Record<string, string>;
+  // `proListQuery` already coerced/validated these, so numbers arrive as numbers.
+  const q = req.query as unknown as {
+    category?: string;
+    city?: string;
+    q?: string;
+    sort?: ProviderSort;
+    verified?: string;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
+    page?: number;
+    perPage?: number;
+  };
   const result = await listProviders({
     category: q.category,
     city: q.city,
     q: q.q,
-    sort: (q.sort as ProviderSort | undefined) ?? DEFAULT_SORT,
+    sort: q.sort ?? DEFAULT_SORT,
     verified: q.verified === 'true',
-    page: Number(q.page) || DEFAULT_PAGE,
-    perPage: Number(q.perPage) || DEFAULT_PER_PAGE,
+    lat: q.lat,
+    lng: q.lng,
+    radiusKm: q.radiusKm,
+    page: q.page ?? DEFAULT_PAGE,
+    perPage: q.perPage ?? DEFAULT_PER_PAGE,
   });
   res.json(result);
 });

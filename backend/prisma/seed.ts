@@ -1,4 +1,4 @@
-import { PrismaClient, Role, KycStatus } from '@prisma/client';
+import { PrismaClient, Role, KycStatus, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -14,13 +14,15 @@ const categories = [
   { id: 'leaf',   name: 'Jardinagem',    iconKey: 'leaf',   hue: 130, order: 8 },
 ];
 
+// Real São Paulo neighbourhood coordinates so `sort=distance` and emergency
+// matching return meaningful, deterministic orderings (no random jitter).
 const proSeeds = [
-  { name: 'Carlos Mendes',  email: 'carlos@zero.dev',  cat: 'plumb',  rating: 4.9, jobs: 312, years: 8,  reviews: 287, priceFrom: 80,  hue: 210 },
-  { name: 'Ana Beatriz',    email: 'ana@zero.dev',     cat: 'bolt',   rating: 4.8, jobs: 198, years: 5,  reviews: 154, priceFrom: 120, hue: 340 },
-  { name: 'Roberto Silva',  email: 'roberto@zero.dev', cat: 'hammer', rating: 4.7, jobs: 76,  years: 12, reviews: 92,  priceFrom: 200, hue: 30  },
-  { name: 'Júlia Santos',   email: 'julia@zero.dev',   cat: 'spray',  rating: 5.0, jobs: 488, years: 4,  reviews: 412, priceFrom: 140, hue: 180 },
-  { name: 'Pedro Costa',    email: 'pedro@zero.dev',   cat: 'brush',  rating: 4.6, jobs: 54,  years: 3,  reviews: 67,  priceFrom: 350, hue: 280 },
-  { name: 'Lucia Ferreira', email: 'lucia@zero.dev',   cat: 'leaf',   rating: 4.9, jobs: 167, years: 6,  reviews: 134, priceFrom: 90,  hue: 130 },
+  { name: 'Carlos Mendes',  email: 'carlos@zero.dev',  cat: 'plumb',  rating: 4.9, jobs: 312, years: 8,  reviews: 287, priceFrom: 80,  hue: 210, nb: 'Vila Madalena', lat: -23.5547, lng: -46.6905 },
+  { name: 'Ana Beatriz',    email: 'ana@zero.dev',     cat: 'bolt',   rating: 4.8, jobs: 198, years: 5,  reviews: 154, priceFrom: 120, hue: 340, nb: 'Pinheiros',     lat: -23.5670, lng: -46.7020 },
+  { name: 'Roberto Silva',  email: 'roberto@zero.dev', cat: 'hammer', rating: 4.7, jobs: 76,  years: 12, reviews: 92,  priceFrom: 200, hue: 30,  nb: 'Itaim Bibi',    lat: -23.5853, lng: -46.6747 },
+  { name: 'Júlia Santos',   email: 'julia@zero.dev',   cat: 'spray',  rating: 5.0, jobs: 488, years: 4,  reviews: 412, priceFrom: 140, hue: 180, nb: 'Moema',         lat: -23.6010, lng: -46.6620 },
+  { name: 'Pedro Costa',    email: 'pedro@zero.dev',   cat: 'brush',  rating: 4.6, jobs: 54,  years: 3,  reviews: 67,  priceFrom: 350, hue: 280, nb: 'Tatuapé',       lat: -23.5402, lng: -46.5760 },
+  { name: 'Lucia Ferreira', email: 'lucia@zero.dev',   cat: 'leaf',   rating: 4.9, jobs: 167, years: 6,  reviews: 134, priceFrom: 90,  hue: 130, nb: 'Santana',       lat: -23.5020, lng: -46.6250 },
 ];
 
 async function main() {
@@ -60,14 +62,14 @@ async function main() {
 
   console.log('Prestadores...');
   for (const p of proSeeds) {
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         name: p.name,
         email: p.email,
         passwordHash,
         role: Role.PROVIDER,
         city: 'São Paulo',
-        neighborhood: 'Vila Madalena',
+        neighborhood: p.nb,
         emailVerified: true,
         avatarHue: p.hue,
         providerProfile: {
@@ -81,8 +83,6 @@ async function main() {
             kycVerifiedAt: new Date(),
             priceFrom: p.priceFrom,
             available: true,
-            latitude: -23.5505 + (Math.random() - 0.5) * 0.05,
-            longitude: -46.6333 + (Math.random() - 0.5) * 0.05,
             categories: { create: { categoryId: p.cat } },
             services: {
               create: [
@@ -97,7 +97,15 @@ async function main() {
           },
         },
       },
+      include: { providerProfile: true },
     });
+
+    // `location` is a PostGIS geography column Prisma can't write directly.
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "ProviderProfile"
+         SET "location" = ST_SetSRID(ST_MakePoint(${p.lng}, ${p.lat}), 4326)::geography
+       WHERE "id" = ${user.providerProfile!.id}
+    `);
   }
 
   console.log('Seed concluído. Login de teste: marina@zero.dev / Senha@123');

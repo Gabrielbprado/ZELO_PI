@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
 
@@ -53,15 +54,31 @@ export async function updateMyProviderProfile(userId: string, input: UpdateProfi
   if (input.yearsExp !== undefined) data.yearsExp = input.yearsExp;
   if (input.priceFrom !== undefined) data.priceFrom = input.priceFrom;
   if (input.available !== undefined) data.available = input.available;
-  if (input.latitude !== undefined) data.latitude = input.latitude;
-  if (input.longitude !== undefined) data.longitude = input.longitude;
+
+  // Coordinates land in the PostGIS `location` geography column, which Prisma
+  // cannot write through `update()` — set it with a raw ST_MakePoint call.
+  const hasCoordinates = input.latitude !== undefined && input.longitude !== undefined;
 
   if (input.categoryIds) {
     await replaceProviderCategories(profile.id, input.categoryIds);
   }
 
-  if (Object.keys(data).length === 0 && !input.categoryIds) {
+  if (Object.keys(data).length === 0 && !input.categoryIds && !hasCoordinates) {
     throw new BadRequestError('Nenhum campo enviado para atualização');
+  }
+
+  if (hasCoordinates) {
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE "ProviderProfile"
+         SET "location" = ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), 4326)::geography
+       WHERE "id" = ${profile.id}
+    `);
+  }
+
+  if (Object.keys(data).length === 0) {
+    // Nothing left for Prisma to write (e.g. only coordinates/categories changed);
+    // return the fresh profile so the caller still gets an up-to-date payload.
+    return getMyProviderProfile(userId);
   }
 
   return prisma.providerProfile.update({

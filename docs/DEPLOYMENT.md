@@ -62,7 +62,30 @@ healthCheck:   /api/v1/health
 The Prisma migrate step is idempotent — already-applied migrations are
 skipped. New migrations are applied before the new code accepts traffic.
 
-### 1.3. Local check before pushing
+### 1.3. PostGIS extension (geolocation)
+
+Real distance matching (`/providers?sort=distance&lat=…&lng=…` and
+`POST /emergency/match`) relies on the **PostGIS** extension. The
+`postgis_location` migration runs `CREATE EXTENSION IF NOT EXISTS postgis`
+as its first statement, so on a fresh database it is enabled automatically
+during `prisma migrate deploy`.
+
+- **Render Postgres** ships PostGIS pre-installed and the migration user has
+  rights to `CREATE EXTENSION`, so no manual step is required on the free plan.
+  If you ever see `permission denied to create extension "postgis"`, run the
+  statement once from the Render database shell as the owner role, then redeploy.
+- **Local / Docker**: use a PostGIS-enabled image such as
+  `postgis/postgis:16-3.4` rather than the vanilla `postgres` image.
+
+There is **no new secret** for this feature. Two optional request parameters
+tune it at call time (no env needed):
+
+| Parameter  | Where                              | Default | Notes                                  |
+| ---------- | ---------------------------------- | ------- | -------------------------------------- |
+| `radiusKm` | `/providers`, `/emergency/match`   | none    | Max distance; capped at 500 km.        |
+| `lat/lng`  | `/providers`, `/emergency/match`   | none    | When omitted, falls back to rating/city. |
+
+### 1.4. Local check before pushing
 
 ```bash
 cd backend

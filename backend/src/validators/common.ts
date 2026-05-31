@@ -14,6 +14,11 @@ const MIN_RATING = 1;
 const MAX_RATING = 5;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
+const MIN_LATITUDE = -90;
+const MAX_LATITUDE = 90;
+const MIN_LONGITUDE = -180;
+const MAX_LONGITUDE = 180;
+const MAX_RADIUS_KM = 500;
 
 export const uuidParam = z.object({
   id: z.string().uuid('ID inválido'),
@@ -30,6 +35,9 @@ export const proListQuery = z.object({
   q: z.string().trim().min(1).max(MAX_QUERY_LENGTH).optional(),
   sort: z.enum(['rating', 'distance', 'price']).default('rating'),
   verified: z.enum(['true', 'false']).optional(),
+  lat: z.coerce.number().min(MIN_LATITUDE).max(MAX_LATITUDE).optional(),
+  lng: z.coerce.number().min(MIN_LONGITUDE).max(MAX_LONGITUDE).optional(),
+  radiusKm: z.coerce.number().positive().max(MAX_RADIUS_KM).optional(),
   page: z.coerce.number().int().min(1).default(1),
   perPage: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
