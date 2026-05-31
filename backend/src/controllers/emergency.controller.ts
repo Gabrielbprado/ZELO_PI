@@ -4,6 +4,12 @@ import { asyncHandler } from '../utils/asyncHandler';
 
 export const match = asyncHandler(async (req, res) => {
   let { city, neighborhood } = req.body as { city?: string; neighborhood?: string };
+  const { categoryId, lat, lng, radiusKm } = req.body as {
+    categoryId: string;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
+  };
 
   if (!city || !neighborhood) {
     const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
@@ -12,9 +18,12 @@ export const match = asyncHandler(async (req, res) => {
   }
 
   const result = await findEmergencyMatch({
-    categoryId: req.body.categoryId,
+    categoryId,
     city,
     neighborhood,
+    lat,
+    lng,
+    radiusKm,
   });
   res.json(result);
 });
