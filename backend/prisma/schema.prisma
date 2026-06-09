@@ -212,13 +212,17 @@ model Review {
 }
 
 model Message {
-  id         String   @id @default(uuid())
-  bookingId  String?
-  senderId   String
-  receiverId String
-  content    String
-  readAt     DateTime?
-  createdAt  DateTime @default(now())
+  id             String   @id @default(uuid())
+  bookingId      String?
+  senderId       String
+  receiverId     String
+  content        String
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentType String?
+  attachmentSize Int?
+  readAt         DateTime?
+  createdAt      DateTime @default(now())
 
   booking  Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   sender   User     @relation("Sender",  fields: [senderId],   references: [id])

@@ -7,6 +7,10 @@ export interface SendMessageInput {
   receiverId: string;
   bookingId?: string;
   content: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentType?: string;
+  attachmentSize?: number;
 }
 
 const THREAD_MAX_MESSAGES = 200;
@@ -34,6 +38,10 @@ export async function sendMessage(senderId: string, input: SendMessageInput) {
       receiverId: input.receiverId,
       bookingId: input.bookingId,
       content: input.content,
+      attachmentUrl: input.attachmentUrl,
+      attachmentName: input.attachmentName,
+      attachmentType: input.attachmentType,
+      attachmentSize: input.attachmentSize,
     },
   });
 
@@ -41,11 +49,12 @@ export async function sendMessage(senderId: string, input: SendMessageInput) {
   realtimeBus.emitMessageCreated(message);
 
   // OS-level push for the offline/foreground case.
+  const previewSource = input.content || (input.attachmentName ? `Arquivo: ${input.attachmentName}` : 'Anexo');
   await pushToUser(input.receiverId, {
     title: sender ? `Nova mensagem de ${sender.name}` : 'Nova mensagem',
-    body: input.content.length > MESSAGE_PREVIEW_MAX
-      ? `${input.content.slice(0, MESSAGE_PREVIEW_MAX)}…`
-      : input.content,
+    body: previewSource.length > MESSAGE_PREVIEW_MAX
+      ? `${previewSource.slice(0, MESSAGE_PREVIEW_MAX)}…`
+      : previewSource,
     data: { type: 'MESSAGE', senderId, bookingId: input.bookingId ?? null },
   });
 
@@ -140,6 +149,18 @@ export async function clearConversations(userId: string): Promise<{ deleted: num
   const { count } = await prisma.message.deleteMany({
     where: {
       OR: [{ senderId: userId }, { receiverId: userId }],
+    },
+  });
+  return { deleted: count };
+}
+
+export async function clearThread(userId: string, otherUserId: string): Promise<{ deleted: number }> {
+  const { count } = await prisma.message.deleteMany({
+    where: {
+      OR: [
+        { senderId: userId, receiverId: otherUserId },
+        { senderId: otherUserId, receiverId: userId },
+      ],
     },
   });
   return { deleted: count };

@@ -72,11 +72,20 @@ export const reviewSchema = {
 };
 
 export const messageSchema = {
-  body: z.object({
-    receiverId: z.string().uuid(),
-    bookingId: z.string().uuid().optional(),
-    content: z.string().trim().min(1).max(MAX_CONTENT_LENGTH),
-  }),
+  body: z
+    .object({
+      receiverId: z.string().uuid(),
+      bookingId: z.string().uuid().optional(),
+      content: z.string().trim().max(MAX_CONTENT_LENGTH).optional().default(''),
+      attachmentUrl: z.string().min(1).max(512).optional(),
+      attachmentName: z.string().min(1).max(255).optional(),
+      attachmentType: z.string().min(1).max(120).optional(),
+      attachmentSize: z.number().int().positive().max(50 * 1024 * 1024).optional(),
+    })
+    .refine((data) => (data.content && data.content.length > 0) || !!data.attachmentUrl, {
+      message: 'Mensagem precisa de conteúdo ou anexo',
+      path: ['content'],
+    }),
 };
 
 export const budgetSchema = {

@@ -1,3 +1,4 @@
+import path from 'path';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -42,6 +43,7 @@ export function createApp() {
   }
 
   app.use(generalLimiter);
+  app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
   app.use('/api/v1', router);
 
   app.use(notFoundHandler);

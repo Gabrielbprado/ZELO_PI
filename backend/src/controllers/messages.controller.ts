@@ -1,5 +1,6 @@
 import {
   clearConversations,
+  clearThread,
   listConversations,
   listThread,
   markAllAsRead,
@@ -8,6 +9,7 @@ import {
 } from '../services/messages.service';
 import { asyncHandler } from '../utils/asyncHandler';
 import { HttpStatus } from '../constants/http';
+import { BadRequestError } from '../errors';
 
 export const send = asyncHandler(async (req, res) => {
   const message = await sendMessage(req.user!.sub, req.body);
@@ -33,4 +35,20 @@ export const clear = asyncHandler(async (req, res) => {
 export const readAll = asyncHandler(async (req, res) => {
   const result = await markAllAsRead(req.user!.sub);
   res.json(result);
+});
+
+export const clearOne = asyncHandler(async (req, res) => {
+  const result = await clearThread(req.user!.sub, req.params.id);
+  res.json(result);
+});
+
+export const uploadAttachment = asyncHandler(async (req, res) => {
+  if (!req.file) throw new BadRequestError('Arquivo ausente');
+  const publicUrl = `/uploads/attachments/${req.file.filename}`;
+  res.status(HttpStatus.CREATED).json({
+    url: publicUrl,
+    name: req.file.originalname,
+    type: req.file.mimetype,
+    size: req.file.size,
+  });
 });

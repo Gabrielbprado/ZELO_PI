@@ -101,6 +101,10 @@ export interface MessageItem {
   receiverId: string;
   content: string;
   bookingId?: string | null;
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
+  attachmentType?: string | null;
+  attachmentSize?: number | null;
   readAt?: string | null;
   createdAt: string;
 }
