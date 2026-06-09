@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, Check, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, Check, ShieldCheck, Calculator } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button } from '../components/Button';
@@ -151,8 +151,8 @@ export default function SmartBudgetScreen() {
         ) : (
           <>
             <ScrollView contentContainerStyle={{ paddingHorizontal: 20, alignItems: 'center', paddingBottom: 120 }}>
-              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: theme.colors.primaryHi, alignItems: 'center', justifyContent: 'center', marginVertical: 16 }}>
-                <Text style={{ fontSize: 32 }}>✨</Text>
+              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.hairline, alignItems: 'center', justifyContent: 'center', marginVertical: 16 }}>
+                <Calculator size={28} color={theme.colors.text} />
               </View>
               <Text style={{ color: theme.colors.textSec, fontSize: 13 }}>Estimativa para o seu serviço</Text>
               <Text style={{ color: theme.colors.text, fontSize: 44, fontWeight: '800', letterSpacing: -1, marginTop: 4 }}>

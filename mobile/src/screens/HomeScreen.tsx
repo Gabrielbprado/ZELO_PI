@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MapPin, ChevronDown, Bell, Search, Zap, ChevronRight, Star } from 'lucide-react-native';
+import { MapPin, ChevronDown, Bell, Search, Zap, ChevronRight, Star, Calculator } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from '../components/Avatar';
@@ -50,7 +50,7 @@ export default function HomeScreen() {
         <View style={{ paddingTop: 8, paddingBottom: 20, backgroundColor: theme.colors.headerGradient }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 16 }}>
             <View>
-              <Text style={{ color: theme.colors.textSec, fontSize: 13 }}>Olá, {user?.name?.split(' ')[0] ?? '👋'}</Text>
+              <Text style={{ color: theme.colors.textSec, fontSize: 13 }}>Olá, {user?.name?.split(' ')[0] ?? 'visitante'}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                 <MapPin size={14} color={theme.colors.accentBlue} />
                 <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 14 }}>
@@ -77,7 +77,7 @@ export default function HomeScreen() {
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 8,
                 backgroundColor: theme.colors.surface, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 4,
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1, borderColor: theme.colors.hairline,
               }}
             >
               <Search size={18} color={theme.colors.textSec} />
@@ -109,15 +109,14 @@ export default function HomeScreen() {
               borderRadius: theme.radius.lg, padding: 16, backgroundColor: theme.colors.primary,
               flexDirection: 'row', alignItems: 'center', gap: 12,
               transform: [{ scale: pressed ? 0.98 : 1 }],
-              shadowColor: theme.colors.primaryHi, shadowOpacity: 0.4, shadowRadius: 12, elevation: 6,
             })}
           >
-            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 22 }}>✨</Text>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' }}>
+              <Calculator size={20} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Orçamento Inteligente</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.78)', fontSize: 12, marginTop: 2 }}>Estime o preço em 4 toques</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Orçamento estimado</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.72)', fontSize: 12, marginTop: 2 }}>Estime o preço em 4 toques</Text>
             </View>
             <ChevronRight size={18} color="rgba(255,255,255,0.7)" />
           </Pressable>
