@@ -18,12 +18,11 @@ export default function WelcomeScreen() {
           <View
             style={{
               width: 88, height: 88, borderRadius: 24,
-              backgroundColor: theme.colors.primaryHi,
+              backgroundColor: theme.colors.primary,
               alignItems: 'center', justifyContent: 'center',
-              shadowColor: theme.colors.primaryHi, shadowOpacity: 0.5, shadowRadius: 20, elevation: 12,
             }}
           >
-            <Zap size={42} color="#fff" fill="#fff" />
+            <Zap size={40} color="#fff" />
           </View>
           <Text style={{ color: theme.colors.text, fontSize: 36, fontWeight: '800', marginTop: 24, letterSpacing: -1 }}>
             ZERO

@@ -173,13 +173,12 @@ export default function ProviderProfileScreen() {
           onPress={() => nav.navigate('Booking', { providerId: pro.id, categoryId: pro.categories[0]?.id ?? '' })}
           style={({ pressed }) => ({
             flex: 1, height: 48, borderRadius: 24,
-            backgroundColor: theme.colors.primaryHi,
+            backgroundColor: theme.colors.primary,
             alignItems: 'center', justifyContent: 'center',
             transform: [{ scale: pressed ? 0.97 : 1 }],
-            shadowColor: theme.colors.primaryHi, shadowOpacity: 0.4, shadowRadius: 12,
           })}
         >
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Contratar · R$ {pro.priceFrom}+</Text>
+          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Contratar · R$ {pro.priceFrom}+</Text>
         </Pressable>
       </View>
     </View>

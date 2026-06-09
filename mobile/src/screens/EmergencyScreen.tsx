@@ -164,8 +164,8 @@ export default function EmergencyScreen() {
         </View>
 
         <View style={{ marginTop: 32, width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}>
-          <Animated.View style={[{ position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(239,68,68,0.15)' }, pulseStyle()]} />
-          <Animated.View style={[{ position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(239,68,68,0.18)' }, pulseStyle()]} />
+          <Animated.View style={[{ position: 'absolute', width: 200, height: 200, borderRadius: 100, borderWidth: 1, borderColor: theme.colors.dangerBg }, pulseStyle()]} />
+          <Animated.View style={[{ position: 'absolute', width: 168, height: 168, borderRadius: 84, borderWidth: 1, borderColor: theme.colors.dangerBg }, pulseStyle()]} />
           <Pressable
             onPress={startMatch}
             disabled={!picked}
@@ -174,12 +174,11 @@ export default function EmergencyScreen() {
               backgroundColor: theme.colors.danger,
               alignItems: 'center', justifyContent: 'center',
               opacity: picked ? 1 : 0.5,
-              shadowColor: theme.colors.danger, shadowOpacity: 0.5, shadowRadius: 20,
               transform: [{ scale: pressed ? 0.95 : 1 }],
             })}
           >
-            <Zap size={28} color="#fff" fill="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 2, marginTop: 6 }}>SOS</Text>
+            <Zap size={26} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 1.5, marginTop: 6 }}>SOS</Text>
           </Pressable>
         </View>
 
