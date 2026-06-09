@@ -1,4 +1,11 @@
-import { listConversations, listThread, markAsRead, sendMessage } from '../services/messages.service';
+import {
+  clearConversations,
+  listConversations,
+  listThread,
+  markAllAsRead,
+  markAsRead,
+  sendMessage,
+} from '../services/messages.service';
 import { asyncHandler } from '../utils/asyncHandler';
 import { HttpStatus } from '../constants/http';
 
@@ -16,4 +23,14 @@ export const thread = asyncHandler(async (req, res) => {
   const items = await listThread(req.user!.sub, req.params.id);
   await markAsRead(req.user!.sub, req.params.id);
   res.json({ items });
+});
+
+export const clear = asyncHandler(async (req, res) => {
+  const result = await clearConversations(req.user!.sub);
+  res.json(result);
+});
+
+export const readAll = asyncHandler(async (req, res) => {
+  const result = await markAllAsRead(req.user!.sub);
+  res.json(result);
 });

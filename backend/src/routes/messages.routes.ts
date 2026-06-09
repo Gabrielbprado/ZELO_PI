@@ -8,6 +8,8 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', ctrl.conversations);
+router.delete('/', ctrl.clear);
+router.post('/read-all', ctrl.readAll);
 router.get('/:id', validate({ params: uuidParam }), ctrl.thread);
 router.post('/', validate(messageSchema), ctrl.send);
 

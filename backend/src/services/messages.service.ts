@@ -90,14 +90,17 @@ interface ConversationRow {
 }
 
 export async function listConversations(userId: string) {
+  // senderId/receiverId are TEXT columns (Prisma `String @id @default(uuid())`),
+  // so we compare them as text — casting the parameter to ::uuid here would
+  // raise "operator does not exist: text = uuid" and silently empty the list.
   const rows = await prisma.$queryRaw<ConversationRow[]>`
     SELECT
-      CASE WHEN "senderId" = ${userId}::uuid THEN "receiverId" ELSE "senderId" END AS other_id,
+      CASE WHEN "senderId" = ${userId} THEN "receiverId" ELSE "senderId" END AS other_id,
       MAX("createdAt") AS last_at,
       (ARRAY_AGG(content ORDER BY "createdAt" DESC))[1] AS last_content,
-      SUM(CASE WHEN "receiverId" = ${userId}::uuid AND "readAt" IS NULL THEN 1 ELSE 0 END) AS unread
+      SUM(CASE WHEN "receiverId" = ${userId} AND "readAt" IS NULL THEN 1 ELSE 0 END) AS unread
     FROM "Message"
-    WHERE "senderId" = ${userId}::uuid OR "receiverId" = ${userId}::uuid
+    WHERE "senderId" = ${userId} OR "receiverId" = ${userId}
     GROUP BY other_id
     ORDER BY last_at DESC
     LIMIT ${CONVERSATIONS_MAX};
@@ -123,4 +126,21 @@ export async function markAsRead(userId: string, otherUserId: string): Promise<v
     where: { senderId: otherUserId, receiverId: userId, readAt: null },
     data: { readAt: new Date() },
   });
+}
+
+export async function markAllAsRead(userId: string): Promise<{ updated: number }> {
+  const { count } = await prisma.message.updateMany({
+    where: { receiverId: userId, readAt: null },
+    data: { readAt: new Date() },
+  });
+  return { updated: count };
+}
+
+export async function clearConversations(userId: string): Promise<{ deleted: number }> {
+  const { count } = await prisma.message.deleteMany({
+    where: {
+      OR: [{ senderId: userId }, { receiverId: userId }],
+    },
+  });
+  return { deleted: count };
 }

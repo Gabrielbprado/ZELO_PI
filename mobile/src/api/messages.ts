@@ -22,3 +22,13 @@ export async function sendMessage(input: { receiverId: string; bookingId?: strin
   const { data } = await api.post<MessageItem>('/messages', input);
   return data;
 }
+
+export async function clearConversations(): Promise<{ deleted: number }> {
+  const { data } = await api.delete<{ deleted: number }>('/messages');
+  return data;
+}
+
+export async function markAllAsRead(): Promise<{ updated: number }> {
+  const { data } = await api.post<{ updated: number }>('/messages/read-all');
+  return data;
+}
