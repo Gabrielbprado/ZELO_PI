@@ -15,7 +15,7 @@ export function Badge({
     success: { bg: theme.colors.successBg, fg: theme.colors.success },
     danger:  { bg: theme.colors.dangerBg,  fg: theme.colors.danger  },
     warn:    { bg: theme.colors.warnBg,    fg: theme.colors.warn    },
-    primary: { bg: theme.mode === 'dark' ? 'rgba(43,77,184,0.18)' : 'rgba(30,58,138,0.12)', fg: theme.colors.accentBlue },
+    primary: { bg: theme.colors.surface2, fg: theme.colors.text },
     neutral: { bg: theme.colors.surface2, fg: theme.colors.textSec },
   };
   const c = tones[tone];

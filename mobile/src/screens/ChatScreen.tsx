@@ -246,14 +246,14 @@ export default function ChatScreen() {
                 style={{
                   alignSelf: mine ? 'flex-end' : 'flex-start',
                   maxWidth: '82%',
-                  backgroundColor: mine ? theme.colors.primary : theme.colors.surface,
+                  backgroundColor: mine ? theme.colors.primaryHi : theme.colors.surface,
                   borderRadius: 14,
                   borderBottomRightRadius: mine ? 4 : 14,
                   borderBottomLeftRadius: mine ? 14 : 4,
                   paddingHorizontal: 12,
                   paddingVertical: 8,
-                  borderWidth: mine ? 0 : 1,
-                  borderColor: theme.colors.hairline,
+                  borderWidth: 1,
+                  borderColor: mine ? theme.colors.primaryHi : theme.colors.hairline,
                 }}
               >
                 {item.attachmentUrl ? (
@@ -345,7 +345,7 @@ export default function ChatScreen() {
             accessibilityLabel="Enviar mensagem"
             style={({ pressed }) => ({
               width: 40, height: 40, borderRadius: 20,
-              backgroundColor: theme.colors.primary,
+              backgroundColor: theme.colors.primaryHi,
               alignItems: 'center', justifyContent: 'center',
               opacity: !sending && (text.trim() || pending) ? 1 : 0.4,
               transform: [{ scale: pressed ? 0.95 : 1 }],
