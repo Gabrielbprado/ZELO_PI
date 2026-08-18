@@ -23,13 +23,30 @@ Opcional, para testar nativamente no simulador:
 
 ## 2. PostgreSQL sem Docker
 
+> **A extensão PostGIS é obrigatória.** A migração `postgis_location` roda
+> `CREATE EXTENSION IF NOT EXISTS postgis` para o casamento por proximidade
+> (`/emergency/match`) e para a âncora geográfica do recomendador. Num Postgres
+> sem o pacote PostGIS instalado, `npm run prisma:migrate` falha com
+> `could not open extension control file ... postgis.control`.
+>
+> Se preferir não instalar nada nativamente, use a imagem oficial já pronta:
+>
+> ```bash
+> docker run -d --name zelo-postgis -p 5432:5432 \
+>   -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=zero_marketplace \
+>   postgis/postgis:16-3.4
+> docker exec zelo-postgis psql -U postgres -c "CREATE DATABASE zero_marketplace_test;"
+> ```
+
 ### Windows
 1. Baixe o instalador em https://www.postgresql.org/download/windows/ (EDB Installer).
 2. Durante a instalação:
    - Defina uma senha para o usuário `postgres` (anote-a — vai entrar no `.env`).
    - Marque para instalar o **pgAdmin** se quiser uma UI gráfica.
-3. Confirme que o serviço **postgresql-x64-16** está rodando em `services.msc`.
-4. Adicione `C:\Program Files\PostgreSQL\16\bin` ao PATH para usar `psql` no terminal.
+3. Ao final, o instalador abre o **Stack Builder** — marque
+   *Spatial Extensions → PostGIS* e conclua a instalação dele também.
+4. Confirme que o serviço **postgresql-x64-16** está rodando em `services.msc`.
+5. Adicione `C:\Program Files\PostgreSQL\16\bin` ao PATH para usar `psql` no terminal.
 
 Crie os bancos:
 
@@ -41,7 +58,7 @@ Crie os bancos:
 ### macOS
 
 ```bash
-brew install postgresql@16
+brew install postgresql@16 postgis
 brew services start postgresql@16
 createdb zero_marketplace
 createdb zero_marketplace_test
@@ -50,7 +67,7 @@ createdb zero_marketplace_test
 ### Linux (Ubuntu/Debian)
 
 ```bash
-sudo apt update && sudo apt install -y postgresql postgresql-contrib
+sudo apt update && sudo apt install -y postgresql postgresql-contrib postgresql-16-postgis-3
 sudo systemctl enable --now postgresql
 sudo -u postgres createdb zero_marketplace
 sudo -u postgres createdb zero_marketplace_test
@@ -231,7 +248,88 @@ npm test
 
 ---
 
-## 7. Troubleshooting
+## 7. Serviço de ML (recomendação personalizada)
+
+O carrossel "Para você" é servido por um microserviço Python separado (`ml/`).
+**Ele é opcional em desenvolvimento**: com o serviço fora do ar, o backend
+devolve a lista ordenada por avaliação e marca `strategy: "fallback"` — o app
+funciona normalmente.
+
+### 7.1 Versão do Python
+
+Use **Python 3.12** (3.11 também serve). **Não use 3.13/3.14**: as wheels de
+`scipy`/`scikit-learn` demoram a sair para versões muito novas, e o `pip` cai
+num build a partir do código-fonte que leva muito tempo e costuma falhar.
+
+```bash
+python3 --version   # se for 3.13+, instale o 3.12 e use-o explicitamente abaixo
+```
+
+### 7.2 Instalação
+
+```bash
+cd ml
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pip install -e .
+```
+
+### 7.3 Dados de treino
+
+O seed de demonstração (`prisma:seed`) tem 6 profissionais e ZERO bookings — não
+há o que treinar. Use o seed sintético, que gera histórico com estrutura
+realista (afinidade de categoria, proximidade, faixa de preço, sazonalidade):
+
+```bash
+cd backend
+npm run prisma:seed:ml -- --verify          # ~200 clientes, 60 pros, ~3000 bookings
+# ATENÇÃO: é destrutivo, apaga os dados atuais do banco apontado por DATABASE_URL
+```
+
+### 7.4 Treinar
+
+```bash
+cd ml
+ML_DATABASE_URL="postgresql://USUARIO:SENHA@localhost:5432/zero_marketplace" \
+  .venv/bin/python -m zelo_ml.training.train --activate
+```
+
+O relatório de avaliação sai em `ml/reports/eval-<versao>.md`, comparando o
+modelo contra a ordenação atual do app. Se o modelo não superar o baseline por
+uma margem mínima, o artefato é gravado como **inativo** — veja `docs/ML.md`.
+
+### 7.5 Rodar (3 terminais)
+
+```bash
+# terminal 1 — backend
+cd backend && npm run dev                                                  # :4000
+
+# terminal 2 — serviço de ML
+cd ml && .venv/bin/uvicorn zelo_ml.api.main:app --reload --port 8001       # :8001
+
+# terminal 3 — app
+cd mobile && npm start
+```
+
+Confira: `curl localhost:8001/health` deve mostrar `"strategy": "ranker"` depois
+do treino (e `"heuristic_fallback"` antes dele).
+
+### 7.6 Variáveis
+
+No `.env` do backend (veja `.env.example`):
+
+| Variável | Padrão | Para que serve |
+| --- | --- | --- |
+| `ML_ENABLED` | `true` | Desligue com `false` para não chamar o serviço |
+| `ML_SERVICE_URL` | — | Ex.: `http://localhost:8001` |
+| `ML_SERVICE_TOKEN` | — | Obrigatório se `ML_SERVICE_URL` estiver definida |
+| `ML_TIMEOUT_MS` | `700` | Acima disso, degrada para ordenação por avaliação |
+| `ML_CANDIDATE_LIMIT` | `150` | Teto de candidatos enviados ao ranker |
+
+No serviço Python, as variáveis usam o mesmo prefixo (`ML_SERVICE_TOKEN`,
+`ML_DATABASE_URL`, `ML_ARTIFACT_BACKEND`).
+
+## 8. Troubleshooting
 
 ### "JWT_ACCESS_SECRET deve ter pelo menos 32 chars"
 Gere uma chave maior com `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`.
@@ -250,3 +348,13 @@ Senha incorreta no `DATABASE_URL`. Confira em `psql` se o usuário/senha funcion
 
 ### Web pede CORS
 Adicione `http://localhost:8081` (ou a origem usada) em `CORS_ORIGINS` no `.env` do backend e reinicie.
+
+### `pip install` fica minutos compilando scipy e falha
+Você está em Python 3.13/3.14. Crie a venv com `python3.12 -m venv .venv` (§7.1).
+
+### Carrossel "Para você" aparece sem os selos de justificativa
+A resposta veio com `strategy: "fallback"` — o serviço de ML não respondeu. É o
+comportamento esperado; confira se ele está no ar em `localhost:8001/health`.
+
+### `/v1/rank` responde 401
+`ML_SERVICE_TOKEN` do backend e do serviço Python precisam ser idênticos.

@@ -111,3 +111,34 @@ design-package/
 # Claude Code workspace (local config)
 # ──────────────────────────────────────────────────────────────
 .claude/settings.local.json
+
+# ──────────────────────────────────────────────────────────────
+# Serviço de ML (Python)
+# ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+ml/artifacts/*
+!ml/artifacts/.gitkeep
+ml/reports/*
+!ml/reports/.gitkeep
+
+# ──────────────────────────────────────────────────────────────
+# Ferramentas de agente (skills locais, traces de browser)
+# ──────────────────────────────────────────────────────────────
+.agents/
+.claude/skills/
+.playwright-mcp/
+skills-lock.json
+
+# ──────────────────────────────────────────────────────────────
+# Artefatos de empacotamento Python
+# ──────────────────────────────────────────────────────────────
+*.egg-info/
+
+# Captura solta gerada em sessão local (as oficiais ficam em docs/screenshots/)
+/zelo-welcome.png
