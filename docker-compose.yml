@@ -1,0 +1,132 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ZELO — ambiente completo em contêineres.
+#
+#   docker compose up --build        banco + API (migrada e populada) + app web
+#   http://localhost:4000            app rodando no navegador
+#
+# Perfis opcionais:
+#   --profile ml                     sobe também o serviço de recomendação
+#   --profile train                  gera histórico sintético e treina o modelo
+#
+# As portas do host são configuráveis (API_PORT, DB_PORT, ML_PORT) porque a
+# 5432 costuma já estar ocupada por um Postgres nativo — por isso o padrão do
+# banco aqui é 55432. A porta da API fica em 4000 de propósito: é o valor que o
+# app web procura quando descobre a API sozinho.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: zelo
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: zelo-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-zero_marketplace}
+    ports:
+      - "${DB_PORT:-55432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-zero_marketplace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # Compila o bundle web do Expo e o entrega no volume `web-dist`. É um job:
+  # roda, copia, termina. A API só sobe depois que ele conclui com sucesso.
+  web:
+    build:
+      context: ./mobile
+      args:
+        EXPO_PUBLIC_API_BASE_URL: ${EXPO_PUBLIC_API_BASE_URL:-}
+    container_name: zelo-web-build
+    volumes:
+      - web-dist:/export
+
+  backend:
+    build:
+      context: ./backend
+    container_name: zelo-api
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-zero_marketplace}?schema=public
+      TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/zero_marketplace_test?schema=public
+      # Segredos de DESENVOLVIMENTO. Estão versionados de propósito, para que
+      # `docker compose up` funcione sem nenhum passo manual. Em qualquer
+      # ambiente exposto, sobrescreva no `.env` da raiz.
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev_only_access_secret_troque_isto_em_producao_0123456789}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev_only_refresh_secret_troque_isto_em_producao_9876543210}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4000,http://localhost:8081,http://localhost:19006}
+      # A API serve o bundle web na mesma origem que a API.
+      WEB_DIST_DIR: /app/web
+      SEED_ON_START: ${SEED_ON_START:-auto}
+      # `ml` só existe no perfil homônimo; sem ele o backend usa o fallback por
+      # avaliação, e é por isso que ML_ENABLED continua true aqui.
+      ML_ENABLED: ${ML_ENABLED:-true}
+      ML_SERVICE_URL: ${ML_SERVICE_URL:-http://ml:8001}
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-dev_only_ml_token_troque_isto_em_producao}
+      ML_TIMEOUT_MS: ${ML_TIMEOUT_MS:-2000}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    volumes:
+      - web-dist:/app/web:ro
+    restart: unless-stopped
+
+  ml:
+    build:
+      context: ./ml
+    container_name: zelo-ml
+    profiles: ["ml", "train"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-dev_only_ml_token_troque_isto_em_producao}
+      ML_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-zero_marketplace}
+      # O artefato mora no Postgres: sobrevive a `docker compose down` e é lido
+      # pelo serviço sem volume compartilhado com quem treinou.
+      ML_ARTIFACT_BACKEND: db
+      ML_MODEL_POLL_SECONDS: ${ML_MODEL_POLL_SECONDS:-60}
+    ports:
+      - "${ML_PORT:-8001}:8001"
+    restart: unless-stopped
+
+  # Job de treino: `docker compose --profile train run --rm ml-train`.
+  # Pressupõe histórico no banco — veja `seed-ml` no docs/DOCKER.md.
+  ml-train:
+    build:
+      context: ./ml
+    container_name: zelo-ml-train
+    profiles: ["train"]
+    depends_on:
+      db:
+        condition: service_healthy
+    # O relatório de avaliação é gravado em `ml/reports/` NO HOST, para ser
+    # lido depois. Por isso o contêiner precisa rodar com o seu usuário: com o
+    # uid embutido na imagem, a escrita no diretório montado dá "permission
+    # denied". Se o seu uid não for 1000, defina DOCKER_UID/DOCKER_GID no .env
+    # (`id -u` / `id -g`).
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    environment:
+      ML_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-zero_marketplace}
+      ML_ARTIFACT_BACKEND: db
+      # Sem isto, bibliotecas que procuram um diretório de cache no HOME do uid
+      # (que não existe na imagem) falham.
+      HOME: /tmp
+    volumes:
+      - ./ml/reports:/app/reports
+    command: ["python", "-m", "zelo_ml.training.train", "--backend", "db", "--activate"]
+
+volumes:
+  db-data:
+  web-dist:

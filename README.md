@@ -23,7 +23,8 @@
 - [O que é](#o-que-é)
 - [Telas](#telas)
 - [Arquitetura](#arquitetura)
-- [Como rodar](#como-rodar) ← **comece por aqui**
+- [Rodar com Docker](#rodar-com-docker) ← **caminho mais curto**
+- [Rodar sem Docker](#rodar-sem-docker)
 - [Testes](#testes)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Estrutura do repositório](#estrutura-do-repositório)
@@ -103,7 +104,40 @@ TypeScript, app React Native e serviço de recomendação em Python.
 
 ---
 
-## Como rodar
+## Rodar com Docker
+
+Um comando sobe tudo: PostgreSQL com PostGIS, API migrada e **já populada com o
+seed**, e o app web servido pela própria API. Só é preciso ter Docker instalado.
+
+```bash
+docker compose up --build
+```
+
+Abra **<http://localhost:4000>** e entre com `marina@zero.dev` / `Senha@123`.
+
+| | |
+|---|---|
+| App web + API | <http://localhost:4000> |
+| Health check | <http://localhost:4000/api/v1/health> |
+| PostgreSQL | `localhost:55432` — `postgres` / `postgres` |
+
+Serviço de recomendação (opcional) e treino do modelo:
+
+```bash
+docker compose --profile ml up --build              # sobe o ranker em :8001
+docker compose exec backend npm run prisma:seed:ml -- --verify   # histórico sintético
+docker compose --profile train run --rm ml-train    # treina (ativa só se passar no gate)
+```
+
+Comandos do dia a dia, controle do seed (`SEED_ON_START`), testes dentro do
+contêiner e solução de problemas: **[`docs/DOCKER.md`](./docs/DOCKER.md)**.
+
+> As imagens copiam o código na build, sem recarga automática. Para
+> desenvolver, use a instalação nativa abaixo.
+
+---
+
+## Rodar sem Docker
 
 ### Pré-requisitos
 
@@ -405,6 +439,7 @@ Segredos, blueprint e vínculo dos projetos: [`docs/DEPLOYMENT.md`](./docs/DEPLO
 | Documento | Conteúdo |
 |---|---|
 | [`docs/SETUP.md`](./docs/SETUP.md) | Instalação detalhada por sistema operacional, testes, troubleshooting |
+| [`docs/DOCKER.md`](./docs/DOCKER.md) | Ambiente completo em contêineres: seed automático, perfis de ML, treino |
 | [`docs/ML.md`](./docs/ML.md) | Model card: dados, features, avaliação, limites e riscos do recomendador |
 | [`docs/SECURITY.md`](./docs/SECURITY.md) | Checklist de segurança do backend |
 | [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) | Deploy em Render e Vercel: secrets, blueprint e vínculo dos projetos |
