@@ -9,6 +9,7 @@ export const StorageKey = {
   ACCESS_TOKEN: 'zero.access',
   REFRESH_TOKEN: 'zero.refresh',
   THEME: 'zero.theme',
+  ONBOARDED_HOME: 'zelo.onboarded.home.v1',
 } as const;
 
 export type StorageKey = (typeof StorageKey)[keyof typeof StorageKey];

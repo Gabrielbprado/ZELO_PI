@@ -16,10 +16,10 @@ interface Props {
 export function Button({ onPress, children, variant = 'primary', loading, disabled, icon, style, textStyle }: Props) {
   const { theme } = useTheme();
   const colors = {
-    primary:   { bg: theme.colors.primaryHi, fg: '#fff' },
-    secondary: { bg: theme.colors.surface,   fg: theme.colors.text },
-    ghost:     { bg: 'transparent',          fg: theme.colors.accentBlue },
-    danger:    { bg: theme.colors.danger,    fg: '#fff' },
+    primary:   { bg: theme.colors.text,     fg: theme.colors.bg,   borderColor: 'transparent' },
+    secondary: { bg: 'transparent',         fg: theme.colors.text, borderColor: theme.colors.hairline2 },
+    ghost:     { bg: 'transparent',         fg: theme.colors.text, borderColor: 'transparent' },
+    danger:    { bg: theme.colors.danger,   fg: '#fff',            borderColor: 'transparent' },
   }[variant];
 
   return (
@@ -27,18 +27,18 @@ export function Button({ onPress, children, variant = 'primary', loading, disabl
       onPress={loading || disabled ? undefined : onPress}
       style={({ pressed }) => [
         {
-          height: 50,
-          borderRadius: 999,
+          height: 54,
+          borderRadius: 14,
           backgroundColor: colors.bg,
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'row',
-          gap: 8,
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
-          transform: [{ scale: pressed ? 0.97 : 1 }],
-          paddingHorizontal: 20,
-          borderWidth: variant === 'secondary' ? 1 : 0,
-          borderColor: theme.colors.hairline,
+          gap: 10,
+          opacity: disabled ? 0.45 : pressed ? 0.9 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+          paddingHorizontal: 24,
+          borderWidth: variant === 'secondary' ? 1.5 : 0,
+          borderColor: colors.borderColor,
         },
         style,
       ]}
@@ -48,7 +48,9 @@ export function Button({ onPress, children, variant = 'primary', loading, disabl
       ) : (
         <>
           {icon && <View>{icon}</View>}
-          <Text style={[{ color: colors.fg, fontSize: 15, fontWeight: '700' }, textStyle]}>{children}</Text>
+          <Text style={[{ color: colors.fg, fontSize: 15, fontWeight: '600', letterSpacing: -0.2 }, textStyle]}>
+            {children}
+          </Text>
         </>
       )}
     </Pressable>

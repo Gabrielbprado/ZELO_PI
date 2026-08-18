@@ -41,19 +41,22 @@ export default function LoginScreen() {
   };
 
   return (
-    <ScreenContainer scroll contentStyle={{ paddingHorizontal: 20 }}>
+    <ScreenContainer scroll contentStyle={{ paddingHorizontal: 28 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable onPress={() => nav.goBack()} style={{ width: 40, height: 40, marginTop: 8 }}>
-          <ArrowLeft color={theme.colors.text} size={22} />
+        <Pressable onPress={() => nav.goBack()} style={{ width: 44, height: 44, marginTop: 8, justifyContent: 'center' }}>
+          <ArrowLeft color={theme.colors.text} size={24} />
         </Pressable>
-        <Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: '800', marginTop: 24 }}>
-          Bem-vindo de volta
-        </Text>
-        <Text style={{ color: theme.colors.textSec, marginTop: 6, marginBottom: 32 }}>
-          Entre para continuar contratando serviços
-        </Text>
 
-        <View style={{ gap: 16 }}>
+        <View style={{ marginTop: 32 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 36, fontWeight: '700', letterSpacing: -1.2, lineHeight: 42 }}>
+            Bom te ver{'\n'}de novo.
+          </Text>
+          <Text style={{ color: theme.colors.textSec, marginTop: 12, fontSize: 15, lineHeight: 22 }}>
+            Entre para continuar.
+          </Text>
+        </View>
+
+        <View style={{ gap: 24, marginTop: 40 }}>
           <Input
             label="E-mail"
             placeholder="voce@email.com"
@@ -73,17 +76,23 @@ export default function LoginScreen() {
             onChangeText={setPassword}
             error={error ?? undefined}
           />
-          <Button loading={loading} onPress={onSubmit}>Entrar</Button>
-          <Pressable onPress={() => nav.navigate('ForgotPassword')}>
-            <Text style={{ color: theme.colors.accentBlue, textAlign: 'center', marginTop: 8 }}>Esqueci minha senha</Text>
+
+          <Pressable onPress={() => nav.navigate('ForgotPassword')} hitSlop={8} style={{ alignSelf: 'flex-end' }}>
+            <Text style={{ color: theme.colors.textSec, fontSize: 13, fontWeight: '600' }}>
+              Esqueci minha senha
+            </Text>
           </Pressable>
+
+          <Button loading={loading} onPress={onSubmit} style={{ marginTop: 8 }}>
+            Entrar
+          </Button>
         </View>
 
-        <View style={{ marginTop: 36, alignItems: 'center' }}>
-          <Text style={{ color: theme.colors.textSec }}>
+        <View style={{ marginTop: 40, alignItems: 'center' }}>
+          <Text style={{ color: theme.colors.textSec, fontSize: 14 }}>
             Não tem conta?{' '}
             <Text
-              style={{ color: theme.colors.accentBlue, fontWeight: '600' }}
+              style={{ color: theme.colors.primary, fontWeight: '700' }}
               onPress={() => nav.navigate('Register', { role: 'CLIENT' })}
             >
               Cadastre-se

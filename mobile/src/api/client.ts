@@ -12,13 +12,21 @@ import {
 
 /**
  * Resolve the API base URL with the following precedence:
- *   1. `expoConfig.extra.apiBaseUrl` — explicit override per environment.
- *   2. On web, derive from the current `window.location` so the app talks
+ *   1. `EXPO_PUBLIC_API_BASE_URL` — inlined at build time. Unlike
+ *      `extra.apiBaseUrl`, which lives in the committed `app.json` and is
+ *      shared by every target, this can be set per build. Accepts a relative
+ *      value (`/api/v1`) so a web bundle served by the backend itself talks
+ *      to it same-origin — no CORS, and no tunnel interstitial on XHR.
+ *   2. `expoConfig.extra.apiBaseUrl` — explicit override per environment.
+ *   3. On web, derive from the current `window.location` so the app talks
  *      to a backend on the same host (works in LAN / tunnel previews).
- *   3. Android emulator → `10.0.2.2` (loopback to the dev machine).
- *   4. Everything else (iOS simulator, web SSR, tests) → `localhost`.
+ *   4. Android emulator → `10.0.2.2` (loopback to the dev machine).
+ *   5. Everything else (iOS simulator, web SSR, tests) → `localhost`.
  */
 function resolveBaseUrl(): string {
+  const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (fromEnv) return fromEnv;
+
   const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
   if (fromExtra) return fromExtra;
 

@@ -4,11 +4,11 @@ import { useTheme } from '../contexts/ThemeContext';
 export function SectionHeader({ title, cta, onCta }: { title: string; cta?: string; onCta?: () => void }) {
   const { theme } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-      <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>{title}</Text>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+      <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.6 }}>{title}</Text>
       {cta && (
-        <Pressable onPress={onCta}>
-          <Text style={{ color: theme.colors.accentBlue, fontSize: 13, fontWeight: '500' }}>{cta}</Text>
+        <Pressable onPress={onCta} hitSlop={8}>
+          <Text style={{ color: theme.colors.textSec, fontSize: 13, fontWeight: '600' }}>{cta}</Text>
         </Pressable>
       )}
     </View>

@@ -12,8 +12,12 @@ export function Input({ label, error, containerStyle, ...rest }: Props) {
   const { theme } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
-    <View style={[{ gap: 6 }, containerStyle]}>
-      {label && <Text style={{ color: theme.colors.textSec, fontSize: 12, fontWeight: '600' }}>{label}</Text>}
+    <View style={[{ gap: 8 }, containerStyle]}>
+      {label && (
+        <Text style={{ color: theme.colors.textSec, fontSize: 12, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+          {label}
+        </Text>
+      )}
       <TextInput
         {...rest}
         onFocus={(e) => { setFocused(true); rest.onFocus?.(e); }}
@@ -21,23 +25,24 @@ export function Input({ label, error, containerStyle, ...rest }: Props) {
         placeholderTextColor={theme.colors.textTer}
         style={[
           {
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.radius.md,
-            paddingHorizontal: 14,
+            backgroundColor: 'transparent',
+            borderRadius: 0,
+            paddingHorizontal: 0,
             paddingVertical: 14,
             color: theme.colors.text,
-            fontSize: 15,
-            borderWidth: 1.5,
-            borderColor: error
+            fontSize: 17,
+            borderWidth: 0,
+            borderBottomWidth: 1.5,
+            borderBottomColor: error
               ? theme.colors.danger
               : focused
-                ? theme.colors.primaryHi
-                : theme.colors.hairline,
+                ? theme.colors.text
+                : theme.colors.hairline2,
           },
           rest.style,
         ]}
       />
-      {error && <Text style={{ color: theme.colors.danger, fontSize: 12 }}>{error}</Text>}
+      {error && <Text style={{ color: theme.colors.danger, fontSize: 12, fontWeight: '500' }}>{error}</Text>}
     </View>
   );
 }
