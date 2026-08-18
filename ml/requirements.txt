@@ -1,0 +1,15 @@
+# Dependências de SERVING.
+#
+# pandas está deliberadamente FORA daqui: ele sozinho custa 70–100 MB
+# residentes e o dyno free do Render tem 512 MB. O caminho de inferência usa
+# apenas numpy. `tests/test_no_pandas_import.py` garante isso automaticamente —
+# a guarda de memória é um teste, não um comentário.
+fastapi~=0.115
+uvicorn[standard]~=0.32
+pydantic~=2.9
+pydantic-settings~=2.6
+numpy~=2.1
+scipy~=1.14
+scikit-learn~=1.5
+joblib~=1.4
+psycopg[binary]~=3.2

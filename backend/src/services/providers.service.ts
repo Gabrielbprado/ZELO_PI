@@ -20,7 +20,12 @@ export interface ListProvidersOptions {
 const KM_IN_METERS = 1000;
 const DISTANCE_PRECISION = 2;
 
-const LIST_PROVIDER_INCLUDE = {
+/**
+ * Exportado para que o recomendador reidrate os profissionais com exatamente o
+ * mesmo shape da listagem pública, em vez de duplicar o DTO. `serializeProvider`
+ * segue sendo a fonte única de verdade do formato que o app consome.
+ */
+export const LIST_PROVIDER_INCLUDE = {
   user: {
     select: { id: true, name: true, avatarHue: true, city: true, neighborhood: true },
   },
@@ -170,14 +175,14 @@ function metersToKm(meters: number): number {
   return Number((meters / KM_IN_METERS).toFixed(DISTANCE_PRECISION));
 }
 
-type ProviderRow = Prisma.ProviderProfileGetPayload<{
+export type ProviderRow = Prisma.ProviderProfileGetPayload<{
   include: typeof LIST_PROVIDER_INCLUDE;
 }> & {
   services?: Prisma.ProviderServiceGetPayload<true>[];
   portfolio?: Prisma.PortfolioItemGetPayload<true>[];
 };
 
-function serializeProvider(p: ProviderRow, distanceKm?: number) {
+export function serializeProvider(p: ProviderRow, distanceKm?: number) {
   return {
     id: p.id,
     userId: p.userId,

@@ -15,6 +15,7 @@ afterEach(async () => {
 export async function truncateAll() {
   // ordem inversa de dependência para satisfazer FKs
   await prisma.$transaction([
+    prisma.recEvent.deleteMany(),
     prisma.review.deleteMany(),
     prisma.message.deleteMany(),
     prisma.payment.deleteMany(),

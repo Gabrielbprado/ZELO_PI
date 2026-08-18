@@ -14,3 +14,13 @@ process.env.BCRYPT_SALT_ROUNDS = '10';
 process.env.RATE_LIMIT_MAX = '10000';
 process.env.AUTH_RATE_LIMIT_MAX = '10000';
 process.env.CORS_ORIGINS = 'http://localhost:8081,http://example.test';
+
+// Recomendação: a integração fica LIGADA e apontada para um host inexistente.
+// `env` é congelado no import, então definir isto em runtime dentro de um teste
+// não teria efeito — precisa estar aqui. Os testes controlam o comportamento
+// mockando `global.fetch`; o padrão (mock que rejeita) representa o serviço de
+// ML fora do ar, que é o estado de qualquer deploy antes do primeiro treino.
+process.env.ML_ENABLED = 'true';
+process.env.ML_SERVICE_URL = 'http://ml.invalido.test';
+process.env.ML_SERVICE_TOKEN = 'token_de_teste_com_16_chars';
+process.env.ML_TIMEOUT_MS = '200';

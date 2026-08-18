@@ -1,0 +1,424 @@
+{
+  "request": {
+    "$defs": {
+      "Candidate": {
+        "description": "Um profissional candidato, já pré-filtrado pelo Postgres.\n\n`rating_avg`/`rating_count` são os contadores desnormalizados; o prior\nbayesiano é recalculado aqui e não confia no `ratingAvg` cru justamente\nporque ele vale 0.0 para quem nunca foi avaliado.",
+        "properties": {
+          "accepted_count": {
+            "default": 0,
+            "title": "Accepted Count",
+            "type": "integer"
+          },
+          "available": {
+            "default": true,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "cancelled_count": {
+            "default": 0,
+            "title": "Cancelled Count",
+            "type": "integer"
+          },
+          "category_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Category Ids",
+            "type": "array"
+          },
+          "completed_count": {
+            "default": 0,
+            "title": "Completed Count",
+            "type": "integer"
+          },
+          "days_since_last_with_client": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Days Since Last With Client"
+          },
+          "distance_km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Distance Km"
+          },
+          "jobs_done": {
+            "default": 0,
+            "title": "Jobs Done",
+            "type": "integer"
+          },
+          "median_response_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Median Response Hours"
+          },
+          "price_from": {
+            "default": 0.0,
+            "title": "Price From",
+            "type": "number"
+          },
+          "prior_bookings_with_client": {
+            "default": 0,
+            "title": "Prior Bookings With Client",
+            "type": "integer"
+          },
+          "prior_completed_with_client": {
+            "default": 0,
+            "title": "Prior Completed With Client",
+            "type": "integer"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "rating_avg": {
+            "default": 0.0,
+            "title": "Rating Avg",
+            "type": "number"
+          },
+          "rating_count": {
+            "default": 0,
+            "title": "Rating Count",
+            "type": "integer"
+          },
+          "requested_count": {
+            "default": 0,
+            "title": "Requested Count",
+            "type": "integer"
+          },
+          "same_city": {
+            "default": false,
+            "title": "Same City",
+            "type": "boolean"
+          },
+          "same_neighborhood": {
+            "default": false,
+            "title": "Same Neighborhood",
+            "type": "boolean"
+          },
+          "service_median_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Service Median Price"
+          },
+          "tenure_days": {
+            "default": 0.0,
+            "title": "Tenure Days",
+            "type": "number"
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "years_exp": {
+            "default": 0,
+            "title": "Years Exp",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "provider_id"
+        ],
+        "title": "Candidate",
+        "type": "object"
+      },
+      "ClientProfile": {
+        "description": "Agregados do cliente. Tudo derivável de um único groupBy no Node.",
+        "properties": {
+          "avg_ticket": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Avg Ticket"
+          },
+          "booking_count": {
+            "default": 0,
+            "title": "Booking Count",
+            "type": "integer"
+          },
+          "category_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Category Counts",
+            "type": "object"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "City"
+          },
+          "days_since_last_booking": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Days Since Last Booking"
+          },
+          "distinct_categories": {
+            "default": 0,
+            "title": "Distinct Categories",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "neighborhood": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Neighborhood"
+          }
+        },
+        "title": "ClientProfile",
+        "type": "object"
+      },
+      "Context": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category Id"
+          },
+          "limit": {
+            "default": 8,
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "urgency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Urgency"
+          }
+        },
+        "required": [
+          "at"
+        ],
+        "title": "Context",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "candidates": {
+        "items": {
+          "$ref": "#/$defs/Candidate"
+        },
+        "maxItems": 200,
+        "minItems": 0,
+        "title": "Candidates",
+        "type": "array"
+      },
+      "client": {
+        "$ref": "#/$defs/ClientProfile"
+      },
+      "context": {
+        "$ref": "#/$defs/Context"
+      },
+      "request_id": {
+        "title": "Request Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "request_id",
+      "client",
+      "context",
+      "candidates"
+    ],
+    "title": "RankRequest",
+    "type": "object"
+  },
+  "response": {
+    "$defs": {
+      "RankedItem": {
+        "properties": {
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/$defs/Reason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "provider_id",
+          "score",
+          "rank"
+        ],
+        "title": "RankedItem",
+        "type": "object"
+      },
+      "Reason": {
+        "properties": {
+          "code": {
+            "enum": [
+              "REHIRE",
+              "SAME_CATEGORY_HISTORY",
+              "NEARBY",
+              "TOP_RATED",
+              "SIMILAR_CLIENTS",
+              "PRICE_FIT",
+              "VERIFIED",
+              "FAST_RESPONSE",
+              "NEW_TALENT"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "Reason",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/$defs/RankedItem"
+        },
+        "title": "Items",
+        "type": "array"
+      },
+      "latency_ms": {
+        "title": "Latency Ms",
+        "type": "number"
+      },
+      "model_version": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Model Version"
+      },
+      "strategy": {
+        "enum": [
+          "ranker",
+          "cold_start_popularity",
+          "heuristic_fallback"
+        ],
+        "title": "Strategy",
+        "type": "string"
+      }
+    },
+    "required": [
+      "model_version",
+      "strategy",
+      "latency_ms",
+      "items"
+    ],
+    "title": "RankResponse",
+    "type": "object"
+  }
+}

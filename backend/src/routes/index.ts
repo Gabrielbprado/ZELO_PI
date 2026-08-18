@@ -9,6 +9,7 @@ import budgetRoutes from './budget.routes';
 import notificationsRoutes from './notifications.routes';
 import paymentsRoutes from './payments.routes';
 import emergencyRoutes from './emergency.routes';
+import recommendationsRoutes from './recommendations.routes';
 
 export const router = Router();
 
@@ -24,3 +25,4 @@ router.use('/budget',        budgetRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/payments',      paymentsRoutes);
 router.use('/emergency',     emergencyRoutes);
+router.use('/recommendations', recommendationsRoutes);

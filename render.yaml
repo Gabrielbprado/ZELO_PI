@@ -50,6 +50,49 @@ services:
         value: 10
       - key: BCRYPT_SALT_ROUNDS
         value: 12
+      # Recomendação personalizada. Se `zelo-ml` estiver hibernando (free tier
+      # dorme após ~15 min), o backend degrada para ordenação por avaliação —
+      # por isso o timeout é generoso mas não infinito.
+      - key: ML_ENABLED
+        value: true
+      - key: ML_SERVICE_URL
+        sync: false
+      - key: ML_SERVICE_TOKEN
+        fromService:
+          type: web
+          name: zelo-ml
+          envVarKey: ML_SERVICE_TOKEN
+      - key: ML_TIMEOUT_MS
+        value: 1500
+
+  - type: web
+    name: zelo-ml
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: ml
+    branch: develop
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    # `--workers 1` não é economia: numpy+scipy+sklearn residentes já ocupam
+    # ~200 MB dos 512 MB do plano free. Um segundo worker estouraria.
+    startCommand: uvicorn zelo_ml.api.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # No Render o filesystem é efêmero: o artefato mora no Postgres, senão
+      # não sobreviveria a um redeploy nem seria visível ao web service.
+      - key: ML_ARTIFACT_BACKEND
+        value: db
+      - key: ML_DATABASE_URL
+        fromDatabase:
+          name: zelo-postgres
+          property: connectionString
+      - key: ML_SERVICE_TOKEN
+        generateValue: true
+      - key: ML_MODEL_POLL_SECONDS
+        value: 300
 
 databases:
   - name: zelo-postgres

@@ -112,3 +112,54 @@ export interface BudgetResult {
   currency: string;
   breakdown: { label: string; value: string }[];
 }
+
+// ── Recomendação personalizada ──────────────────────────────────────────────
+
+export type RecReasonCode =
+  | 'REHIRE'
+  | 'SAME_CATEGORY_HISTORY'
+  | 'NEARBY'
+  | 'TOP_RATED'
+  | 'SIMILAR_CLIENTS'
+  | 'PRICE_FIT'
+  | 'VERIFIED'
+  | 'FAST_RESPONSE'
+  | 'NEW_TALENT';
+
+export interface RecReason {
+  code: RecReasonCode;
+  /** Texto já em pt-BR, montado pelo backend. */
+  label: string;
+  value: number | null;
+}
+
+/** Estratégia usada; `fallback` = o ML não respondeu e a lista veio por avaliação. */
+export type RecStrategy =
+  | 'ranker'
+  | 'cold_start_popularity'
+  | 'heuristic_fallback'
+  | 'fallback';
+
+/** Estende `Provider` em vez de bifurcá-lo: o mesmo card serve os dois casos. */
+export interface RecommendedProvider extends Provider {
+  score: number | null;
+  reasons: RecReason[];
+}
+
+export interface ForYouResponse {
+  items: RecommendedProvider[];
+  strategy: RecStrategy;
+  modelVersion: string | null;
+  /** Correlaciona a lista exibida com os eventos de telemetria. */
+  requestId: string;
+}
+
+export interface RecEventInput {
+  providerId: string;
+  type: 'IMPRESSION' | 'CLICK';
+  position: number;
+  score?: number | null;
+  modelVersion?: string | null;
+  strategy?: string | null;
+  categoryId?: string | null;
+}

@@ -54,6 +54,12 @@ enum NotificationType {
   SYSTEM
 }
 
+enum RecEventType {
+  IMPRESSION
+  CLICK
+  BOOKED
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -84,6 +90,7 @@ model User {
   notifications    Notification[]
   budgetEstimates  BudgetEstimate[]
   auditLogs        AuditLog[]
+  recEvents        RecEvent[]
 
   @@index([city, neighborhood])
 }
@@ -113,6 +120,7 @@ model ProviderProfile {
   bookings   Booking[]
   portfolio  PortfolioItem[]
   categories ProviderCategory[]
+  recEvents  RecEvent[]
 
   @@index([available, ratingAvg])
 }
@@ -180,6 +188,11 @@ model Booking {
   status      BookingStatus  @default(REQUESTED)
   priceEstimate Int?
   priceFinal  Int?
+  // Onde o serviço foi prestado, como ponto PostGIS (SRID 4326).
+  // Unsupported pelo Prisma Client — escrito via $executeRaw (ST_MakePoint),
+  // igual a ProviderProfile.location. Usado como âncora geográfica do cliente
+  // no recomendador (ST_Centroid sobre os últimos bookings).
+  location    Unsupported("geography(Point, 4326)")?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   completedAt DateTime?
@@ -281,6 +294,46 @@ model BudgetEstimate {
   createdAt  DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+/// Telemetria do carrossel de recomendação. Cada resposta de
+/// GET /recommendations/for-you tem um requestId; as impressões e cliques
+/// referenciam esse id, o que permite reconstruir o conjunto exibido e treinar
+/// com dados reais (positivo = CLICK/BOOKED, negativo = IMPRESSION sem CLICK).
+model RecEvent {
+  id           String       @id @default(uuid())
+  requestId    String
+  userId       String
+  providerId   String
+  type         RecEventType
+  position     Int
+  score        Float?
+  modelVersion String?
+  strategy     String?
+  categoryId   String?
+  createdAt    DateTime     @default(now())
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([userId, createdAt])
+  @@index([providerId, type])
+}
+
+/// Artefato do modelo treinado (joblib serializado). No Render free o
+/// filesystem é efêmero, então o binário mora no Postgres e o serviço Python
+/// faz apenas SELECT/INSERT — o Prisma segue dono do schema.
+model MlModelArtifact {
+  id           String   @id @default(uuid())
+  version      String   @unique
+  blob         Bytes
+  metrics      Json?
+  featureNames Json?
+  isActive     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([isActive, createdAt])
 }
 
 model AuditLog {

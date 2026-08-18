@@ -1,18 +1,8 @@
 import { PrismaClient, Role, KycStatus, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { categories } from './seed.shared';
 
 const prisma = new PrismaClient();
-
-const categories = [
-  { id: 'plumb',  name: 'Encanador',     iconKey: 'plumb',  hue: 210, order: 1 },
-  { id: 'bolt',   name: 'Eletricista',   iconKey: 'bolt',   hue: 45,  order: 2 },
-  { id: 'hammer', name: 'Reformas',      iconKey: 'hammer', hue: 25,  order: 3 },
-  { id: 'brush',  name: 'Pintura',       iconKey: 'brush',  hue: 280, order: 4 },
-  { id: 'spray',  name: 'Limpeza',       iconKey: 'spray',  hue: 180, order: 5 },
-  { id: 'sofa',   name: 'Móveis',        iconKey: 'sofa',   hue: 320, order: 6 },
-  { id: 'hvac',   name: 'Ar-condic.',    iconKey: 'hvac',   hue: 195, order: 7 },
-  { id: 'leaf',   name: 'Jardinagem',    iconKey: 'leaf',   hue: 130, order: 8 },
-];
 
 // Real São Paulo neighbourhood coordinates so `sort=distance` and emergency
 // matching return meaningful, deterministic orderings (no random jitter).
