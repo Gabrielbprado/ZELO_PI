@@ -89,15 +89,22 @@ interface ConversationRow {
   unread: bigint;
 }
 
+/**
+ * Os ids do schema são `String` no Prisma, ou seja, colunas `text` no Postgres — e não
+ * `uuid`, apesar do `@default(uuid())`. Uma versão anterior desta query castava o
+ * parâmetro para `::uuid`, o que produzia `text = uuid`, um operador que não existe:
+ * TODA chamada respondia 500 e a lista de conversas nunca carregava. Não adicione o
+ * cast de volta sem antes mudar o tipo da coluna.
+ */
 export async function listConversations(userId: string) {
   const rows = await prisma.$queryRaw<ConversationRow[]>`
     SELECT
-      CASE WHEN "senderId" = ${userId}::uuid THEN "receiverId" ELSE "senderId" END AS other_id,
+      CASE WHEN "senderId" = ${userId} THEN "receiverId" ELSE "senderId" END AS other_id,
       MAX("createdAt") AS last_at,
       (ARRAY_AGG(content ORDER BY "createdAt" DESC))[1] AS last_content,
-      SUM(CASE WHEN "receiverId" = ${userId}::uuid AND "readAt" IS NULL THEN 1 ELSE 0 END) AS unread
+      SUM(CASE WHEN "receiverId" = ${userId} AND "readAt" IS NULL THEN 1 ELSE 0 END) AS unread
     FROM "Message"
-    WHERE "senderId" = ${userId}::uuid OR "receiverId" = ${userId}::uuid
+    WHERE "senderId" = ${userId} OR "receiverId" = ${userId}
     GROUP BY other_id
     ORDER BY last_at DESC
     LIMIT ${CONVERSATIONS_MAX};
