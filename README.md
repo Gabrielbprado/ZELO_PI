@@ -424,7 +424,7 @@ Códigos: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`,
 
 | Pipeline | Gatilho | Alvo |
 |---|---|---|
-| [`ci.yml`](./.github/workflows/ci.yml) | push / PR em `develop` e `main` | Typecheck + testes (backend, mobile, ML) |
+| [`ci.yml`](./.github/workflows/ci.yml) | push / PR em `develop` e `main` | Typecheck + testes unitários e **de integração** (backend), tipos + cores + contraste WCAG (mobile), lint + tipos + testes e contrato (ML) |
 | [`sonarcloud.yml`](./.github/workflows/sonarcloud.yml) | push / PR em `develop` e `main` | Análise de qualidade |
 | [`deploy-backend.yml`](./.github/workflows/deploy-backend.yml) | push em `develop` (`backend/**`) | Render |
 | [`deploy-frontend.yml`](./.github/workflows/deploy-frontend.yml) | push em `develop` (`mobile/**`) | Vercel |
