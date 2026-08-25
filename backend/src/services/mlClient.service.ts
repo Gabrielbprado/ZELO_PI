@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { env } from '../config/env';
+import { getRedis } from '../config/redis';
 import { REC_REASON_CODES } from '../constants/recommendations';
 import { logger } from '../utils/logger';
 
@@ -47,9 +48,24 @@ export interface MlRankPayload {
   candidates: Array<Record<string, unknown>>;
 }
 
+/**
+ * Estado do breaker.
+ *
+ * Vive no Redis quando ele existe, e em memória quando não. A diferença importa mais do
+ * que parece: com estado por processo, N instâncias abrem N circuitos independentes, e
+ * cada uma precisa pagar o timeout inteiro por conta própria antes de proteger o seu
+ * tráfego. Um serviço de ML hibernando no free tier — que é o caso comum aqui — leva
+ * 30-60s para responder, então o custo dessa duplicação recai direto na Home.
+ *
+ * O estado local é mantido em paralelo, e não substituído: se o Redis cair, o breaker
+ * continua funcionando com o comportamento anterior em vez de sumir junto.
+ */
 const circuit = { failures: 0, openedAt: 0 };
 
-function isOpen(): boolean {
+const CIRCUIT_OPEN_KEY = 'ml:circuit:open';
+const CIRCUIT_FAILURES_KEY = 'ml:circuit:failures';
+
+function isOpenLocally(): boolean {
   if (circuit.failures < env.ML_CIRCUIT_FAILURE_THRESHOLD) return false;
   if (Date.now() - circuit.openedAt >= env.ML_CIRCUIT_COOLDOWN_MS) {
     // Cooldown vencido: deixa uma requisição passar para sondar a recuperação.
@@ -59,7 +75,22 @@ function isOpen(): boolean {
   return true;
 }
 
-function recordFailure(): void {
+async function isOpen(): Promise<boolean> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      // O TTL da chave É o cooldown: quando ela expira, a próxima requisição
+      // naturalmente sonda o serviço. Não há relógio a sincronizar entre instâncias.
+      const open = await redis.exists(CIRCUIT_OPEN_KEY);
+      if (open === 1) return true;
+    } catch {
+      // Redis fora: cai no estado local, que é a garantia mínima.
+    }
+  }
+  return isOpenLocally();
+}
+
+async function recordFailure(): Promise<void> {
   circuit.failures += 1;
   if (circuit.failures === env.ML_CIRCUIT_FAILURE_THRESHOLD) {
     circuit.openedAt = Date.now();
@@ -68,12 +99,51 @@ function recordFailure(): void {
       'circuito do serviço de ML aberto; servindo ranking por avaliação',
     );
   }
+
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    const cooldownSec = Math.ceil(env.ML_CIRCUIT_COOLDOWN_MS / 1000);
+    const failures = await redis.incr(CIRCUIT_FAILURES_KEY);
+    // A janela de contagem expira junto com o cooldown: falhas esparsas ao longo de
+    // horas não devem somar até abrir o circuito.
+    if (failures === 1) await redis.expire(CIRCUIT_FAILURES_KEY, cooldownSec);
+    if (failures >= env.ML_CIRCUIT_FAILURE_THRESHOLD) {
+      await redis.set(CIRCUIT_OPEN_KEY, '1', 'EX', cooldownSec);
+      await redis.del(CIRCUIT_FAILURES_KEY);
+    }
+  } catch {
+    // Estado compartilhado é melhor-esforço; o local já registrou a falha.
+  }
 }
 
-/** Reseta o breaker. Usado pelos testes; inofensivo em produção. */
-export function resetCircuit(): void {
+async function recordSuccess(): Promise<void> {
+  circuit.failures = 0;
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.del(CIRCUIT_FAILURES_KEY);
+  } catch {
+    // idem
+  }
+}
+
+/** Reseta o breaker nos dois planos. Usado pelos testes; inofensivo em produção. */
+export async function resetCircuit(): Promise<void> {
   circuit.failures = 0;
   circuit.openedAt = 0;
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.del(CIRCUIT_OPEN_KEY, CIRCUIT_FAILURES_KEY);
+  } catch {
+    // idem
+  }
+}
+
+/** Estado legível para o health check e para as métricas. */
+export async function circuitState(): Promise<'closed' | 'open'> {
+  return (await isOpen()) ? 'open' : 'closed';
 }
 
 export function isMlConfigured(): boolean {
@@ -81,7 +151,7 @@ export function isMlConfigured(): boolean {
 }
 
 export async function rankProviders(payload: MlRankPayload): Promise<MlRankResponse | null> {
-  if (!isMlConfigured() || isOpen()) return null;
+  if (!isMlConfigured() || (await isOpen())) return null;
 
   try {
     const res = await fetch(`${env.ML_SERVICE_URL}/v1/rank`, {
@@ -96,7 +166,7 @@ export async function rankProviders(payload: MlRankPayload): Promise<MlRankRespo
 
     if (!res.ok) {
       logger.warn({ status: res.status }, 'serviço de ML respondeu com status não-2xx');
-      recordFailure();
+      await recordFailure();
       return null;
     }
 
@@ -105,16 +175,16 @@ export async function rankProviders(payload: MlRankPayload): Promise<MlRankRespo
       // Corpo inesperado é tão ruim quanto serviço fora do ar: o contrato
       // divergiu e ranquear com dado malformado seria pior que degradar.
       logger.warn({ issues: parsed.error.issues }, 'resposta do serviço de ML fora do contrato');
-      recordFailure();
+      await recordFailure();
       return null;
     }
 
-    circuit.failures = 0;
+    await recordSuccess();
     return parsed.data;
   } catch (err) {
     const timedOut = err instanceof Error && err.name === 'TimeoutError';
     logger.warn({ err: timedOut ? 'timeout' : err }, 'chamada ao serviço de ML falhou');
-    recordFailure();
+    await recordFailure();
     return null;
   }
 }

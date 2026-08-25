@@ -1,6 +1,9 @@
+import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
+import { env } from '../config/env';
 import { NotFoundError } from '../errors';
+import { cacheKeys, invalidate, invalidatePrefix, withCache } from './cache.service';
 
 export type ProviderSort = 'rating' | 'price' | 'distance';
 
@@ -38,7 +41,33 @@ const DETAIL_PROVIDER_INCLUDE = {
   portfolio: true,
 } as const;
 
+/**
+ * Impressão digital dos filtros, para servir de chave de cache.
+ *
+ * A busca textual (`q`) fica DE FORA do cache de propósito: sua cardinalidade é
+ * ilimitada — cada string digitada viraria uma chave — e envenenaria o Redis com
+ * entradas de uso único. O caminho certo para ela é um índice de texto no Postgres,
+ * não cache.
+ */
+function listFingerprint(opts: ListProvidersOptions): string {
+  const parts = [
+    opts.category ?? '', opts.city ?? '', String(opts.verified ?? ''),
+    opts.sort ?? '', String(opts.page), String(opts.perPage),
+    String(opts.lat ?? ''), String(opts.lng ?? ''), String(opts.radiusKm ?? ''),
+  ].join('|');
+  return createHash('sha1').update(parts).digest('hex').slice(0, 16);
+}
+
 export async function listProviders(opts: ListProvidersOptions) {
+  if (opts.q?.trim()) return listProvidersUncached(opts);
+  return withCache(
+    cacheKeys.providerList(listFingerprint(opts)),
+    env.CACHE_TTL_PROVIDER_LIST_SEC,
+    () => listProvidersUncached(opts),
+  );
+}
+
+async function listProvidersUncached(opts: ListProvidersOptions) {
   if (opts.sort === 'distance' && opts.lat !== undefined && opts.lng !== undefined) {
     return listProvidersByDistance({ ...opts, lat: opts.lat, lng: opts.lng });
   }
@@ -141,12 +170,31 @@ function buildDistanceWhere(opts: ListProvidersOptions, point: Prisma.Sql): Pris
 }
 
 export async function getProviderById(id: string) {
-  const provider = await prisma.providerProfile.findUnique({
-    where: { id },
-    include: DETAIL_PROVIDER_INCLUDE,
+  // O 404 fica fora do cache: `withCache` não guarda `undefined`, e cachear a
+  // ausência abriria caminho para um id inexistente ocupar chave até o TTL.
+  const provider = await withCache(cacheKeys.provider(id), env.CACHE_TTL_PROVIDER_SEC, async () => {
+    const found = await prisma.providerProfile.findUnique({
+      where: { id },
+      include: DETAIL_PROVIDER_INCLUDE,
+    });
+    return found ? serializeProvider(found) : undefined;
   });
   if (!provider) throw new NotFoundError('Profissional não encontrado');
-  return serializeProvider(provider);
+  return provider;
+}
+
+/**
+ * Derruba o cache de um profissional e o das listagens.
+ *
+ * A listagem é invalidada inteira, e não seletivamente: uma mudança de nota ou de
+ * preço reordena páginas que não dá para prever a partir do id. Com TTL de 60s, o
+ * custo de recomputar é baixo; o de servir uma lista errada, não.
+ */
+export async function invalidateProviderCaches(providerId: string): Promise<void> {
+  await Promise.all([
+    invalidate(cacheKeys.provider(providerId)),
+    invalidatePrefix(cacheKeys.providerListPrefix),
+  ]);
 }
 
 function buildProviderListWhere(opts: ListProvidersOptions): Prisma.ProviderProfileWhereInput {

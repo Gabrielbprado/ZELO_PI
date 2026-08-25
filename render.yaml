@@ -64,6 +64,16 @@ services:
           envVarKey: ML_SERVICE_TOKEN
       - key: ML_TIMEOUT_MS
         value: 1500
+      # Redis. O Render não oferece Redis gerenciado no plano free, então a URL
+      # aponta para um provedor externo com free tier (Upstash) e é preenchida no
+      # dashboard. Se ficar vazia, basta REDIS_ENABLED=false: a API sobe sem cache,
+      # com rate limit por instância — degradação prevista, não falha.
+      - key: REDIS_ENABLED
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_KEY_PREFIX
+        value: zelo-prod
 
   - type: web
     name: zelo-ml

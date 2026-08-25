@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
+import { invalidateProviderCaches } from './providers.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
 
 export interface UpdateProfileInput {
@@ -78,10 +79,11 @@ export async function updateMyProviderProfile(userId: string, input: UpdateProfi
   if (Object.keys(data).length === 0) {
     // Nothing left for Prisma to write (e.g. only coordinates/categories changed);
     // return the fresh profile so the caller still gets an up-to-date payload.
+    await invalidateProviderCaches(profile.id);
     return getMyProviderProfile(userId);
   }
 
-  return prisma.providerProfile.update({
+  const updated = await prisma.providerProfile.update({
     where: { id: profile.id },
     data,
     include: {
@@ -89,6 +91,9 @@ export async function updateMyProviderProfile(userId: string, input: UpdateProfi
       services: { orderBy: { createdAt: 'asc' } },
     },
   });
+
+  await invalidateProviderCaches(profile.id);
+  return updated;
 }
 
 async function replaceProviderCategories(providerId: string, categoryIds: string[]): Promise<void> {
@@ -101,7 +106,7 @@ async function replaceProviderCategories(providerId: string, categoryIds: string
 
 export async function createService(userId: string, input: ServiceInput) {
   const profile = await ensureProviderProfile(userId);
-  return prisma.providerService.create({
+  const service = await prisma.providerService.create({
     data: {
       providerId: profile.id,
       categoryId: input.categoryId,
@@ -112,6 +117,9 @@ export async function createService(userId: string, input: ServiceInput) {
       unit: input.unit ?? DEFAULT_SERVICE_UNIT,
     },
   });
+  // Serviços entram no detalhe do profissional e na busca por título.
+  await invalidateProviderCaches(profile.id);
+  return service;
 }
 
 export async function updateService(
@@ -133,7 +141,9 @@ export async function updateService(
   if (input.priceMax !== undefined) data.priceMax = input.priceMax;
   if (input.unit !== undefined) data.unit = input.unit;
 
-  return prisma.providerService.update({ where: { id: serviceId }, data });
+  const updated = await prisma.providerService.update({ where: { id: serviceId }, data });
+  await invalidateProviderCaches(profile.id);
+  return updated;
 }
 
 export async function deleteService(userId: string, serviceId: string): Promise<void> {
@@ -143,4 +153,5 @@ export async function deleteService(userId: string, serviceId: string): Promise<
     throw new NotFoundError('Serviço não encontrado');
   }
   await prisma.providerService.delete({ where: { id: serviceId } });
+  await invalidateProviderCaches(profile.id);
 }

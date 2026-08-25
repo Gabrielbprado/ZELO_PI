@@ -13,14 +13,14 @@ import { resetCircuit } from '../../src/services/mlClient.service';
 const fetchOriginal = global.fetch;
 
 /** Estado padrão: serviço de ML fora do ar. Os testes que precisam dele o mockam. */
-beforeEach(() => {
-  resetCircuit();
+beforeEach(async () => {
+  await resetCircuit();
   global.fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) as unknown as typeof fetch;
 });
 
-afterEach(() => {
+afterEach(async () => {
   global.fetch = fetchOriginal;
-  resetCircuit();
+  await resetCircuit();
 });
 
 describe('GET /recommendations/for-you', () => {

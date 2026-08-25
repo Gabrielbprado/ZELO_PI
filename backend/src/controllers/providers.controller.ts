@@ -1,6 +1,8 @@
 import type { ProviderSort } from '../services/providers.service';
 import { getProviderById, listProviders } from '../services/providers.service';
 import { prisma } from '../config/prisma';
+import { env } from '../config/env';
+import { cacheKeys, withCache } from '../services/cache.service';
 import { asyncHandler } from '../utils/asyncHandler';
 
 const DEFAULT_PAGE = 1;
@@ -41,7 +43,13 @@ export const getById = asyncHandler(async (req, res) => {
   res.json(provider);
 });
 
+/**
+ * Categorias mudam por deploy, não por requisição, e toda abertura da Home as pede.
+ * É o cache de melhor relação ganho/risco do sistema.
+ */
 export const listCategories = asyncHandler(async (_req, res) => {
-  const items = await prisma.category.findMany({ orderBy: { order: 'asc' } });
+  const items = await withCache(cacheKeys.categories, env.CACHE_TTL_CATEGORIES_SEC, () =>
+    prisma.category.findMany({ orderBy: { order: 'asc' } }),
+  );
   res.json({ items });
 });

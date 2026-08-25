@@ -27,6 +27,7 @@ Entre com uma das contas criadas pelo seed:
 | Serviço | Imagem / contexto | Porta no host | Papel |
 |---|---|---|---|
 | `db` | `postgis/postgis:16-3.4` | `55432` | PostgreSQL 16 **com PostGIS** |
+| `redis` | `redis:7-alpine` | `56379` | Cache, rate limit distribuído e estado do circuit breaker |
 | `web` | `./mobile` | — | Job: compila o bundle web e sai |
 | `backend` | `./backend` | `4000` | API + WebSocket + app web |
 | `ml` | `./ml` | `8001` | Recomendação (perfil `ml`, opcional) |
@@ -35,6 +36,24 @@ Entre com uma das contas criadas pelo seed:
 O `web` não serve nada: ele compila o app, entrega o resultado no volume
 `web-dist` e termina. Quem serve é a API, pela variável `WEB_DIST_DIR` — uma
 origem só, sem CORS e sem porta extra no navegador.
+
+O `redis` sobe **sem volume**, de propósito: nada ali pode ser fonte da verdade.
+Perder o container inteiro só esvazia o cache. Para conferir que a API não depende
+dele:
+
+```bash
+docker compose stop redis
+curl -s localhost:4000/api/v1/providers -o /dev/null -w '%{http_code}\n'   # 200
+curl -s localhost:4000/api/v1/health/ready                                 # "degraded", HTTP 200
+docker compose start redis                                                 # volta a cachear sozinho
+```
+
+Para inspecionar o que está cacheado:
+
+```bash
+docker compose exec redis redis-cli KEYS 'zelo:*'
+docker compose exec redis redis-cli TTL 'zelo:cat:all'
+```
 
 A porta do banco é **55432** e não 5432 porque é comum já haver um PostgreSQL
 nativo ocupando a 5432 na máquina. A da API é 4000 de propósito: é a porta que

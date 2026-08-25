@@ -10,10 +10,11 @@ import notificationsRoutes from './notifications.routes';
 import paymentsRoutes from './payments.routes';
 import emergencyRoutes from './emergency.routes';
 import recommendationsRoutes from './recommendations.routes';
+import healthRoutes from './health.routes';
 
 export const router = Router();
 
-router.get('/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+router.use('/health', healthRoutes);
 
 router.use('/auth',          authRoutes);
 router.use('/users',         usersRoutes);

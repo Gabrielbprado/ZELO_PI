@@ -8,9 +8,9 @@
 #   --profile ml                     sobe também o serviço de recomendação
 #   --profile train                  gera histórico sintético e treina o modelo
 #
-# As portas do host são configuráveis (API_PORT, DB_PORT, ML_PORT) porque a
-# 5432 costuma já estar ocupada por um Postgres nativo — por isso o padrão do
-# banco aqui é 55432. A porta da API fica em 4000 de propósito: é o valor que o
+# As portas do host são configuráveis (API_PORT, DB_PORT, ML_PORT, REDIS_PORT)
+# porque a 5432 costuma já estar ocupada por um Postgres nativo — por isso o
+# padrão do banco aqui é 55432, e o do Redis, 56379. A porta da API fica em 4000 de propósito: é o valor que o
 # app web procura quando descobre a API sozinho.
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -36,6 +36,22 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # Cache, rate limit distribuído e estado compartilhado do circuit breaker.
+  # Deliberadamente SEM volume: nada aqui pode ser fonte da verdade. Se o Redis
+  # for embora, a API continua servindo — é o que o teste de degradação garante.
+  redis:
+    image: redis:7-alpine
+    container_name: zelo-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "${REDIS_PORT:-56379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   # Compila o bundle web do Expo e o entrega no volume `web-dist`. É um job:
   # roda, copia, termina. A API só sobe depois que ele conclui com sucesso.
   web:
@@ -53,6 +69,8 @@ services:
     container_name: zelo-api
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       web:
         condition: service_completed_successfully
@@ -76,6 +94,8 @@ services:
       ML_SERVICE_URL: ${ML_SERVICE_URL:-http://ml:8001}
       ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-dev_only_ml_token_troque_isto_em_producao}
       ML_TIMEOUT_MS: ${ML_TIMEOUT_MS:-2000}
+      REDIS_ENABLED: ${REDIS_ENABLED:-true}
+      REDIS_URL: redis://redis:6379
     ports:
       - "${API_PORT:-4000}:4000"
     volumes:

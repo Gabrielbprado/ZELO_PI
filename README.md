@@ -25,6 +25,7 @@
 - [Arquitetura](#arquitetura)
 - [Rodar com Docker](#rodar-com-docker) ← **caminho mais curto**
 - [Rodar sem Docker](#rodar-sem-docker)
+- [Cache e resiliência (Redis)](#cache-e-resiliência-redis)
 - [Testes](#testes)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Estrutura do repositório](#estrutura-do-repositório)
@@ -84,7 +85,14 @@ TypeScript, app React Native e serviço de recomendação em Python.
 │                     Backend — Node.js / Express                    │
 │  routes → controllers → services → Prisma → PostgreSQL + PostGIS   │
 │  helmet · cors · hpp · rate-limit · zod · auth · socket.io         │
-└───────────────┬────────────────────────────────────────────────────┘
+└──────┬────────────────────────────────────────┬────────────────────┘
+       │ cache · rate limit · circuit breaker   │
+┌──────▼───────────────────┐                    │
+│  Redis  (OPCIONAL)       │                    │
+│  fora do ar ⇒ a API      │                    │
+│  serve direto do banco   │                    │
+└──────────────────────────┘                    │
+                                                │
                 │ POST /v1/rank  (só ids e números — sem dado pessoal)
 ┌───────────────▼────────────────────────────────────────────────────┐
 │                 Serviço de ML — Python / FastAPI                   │
@@ -99,6 +107,7 @@ TypeScript, app React Native e serviço de recomendação em Python.
 | Backend | Node.js 20+, Express 4, TypeScript 5, Prisma 5, Zod, Pino, Socket.IO 4 |
 | ML | Python 3.12, FastAPI, scikit-learn, NumPy, SciPy (sem pandas em produção) |
 | Banco | PostgreSQL 14+ **com PostGIS** |
+| Cache | Redis 7 — **opcional**: cache de leitura, rate limit entre instâncias e estado compartilhado do circuit breaker |
 | Segurança | bcryptjs, JWT (access + refresh rotativo), Helmet, allow-list de CORS, `express-rate-limit`, `hpp` |
 | Testes | Jest + Supertest (unit + integração), pytest (ML) |
 
@@ -120,6 +129,7 @@ Abra **<http://localhost:4000>** e entre com `marina@zero.dev` / `Senha@123`.
 | App web + API | <http://localhost:4000> |
 | Health check | <http://localhost:4000/api/v1/health> |
 | PostgreSQL | `localhost:55432` — `postgres` / `postgres` |
+| Redis | `localhost:56379` |
 
 Serviço de recomendação (opcional) e treino do modelo:
 
@@ -279,6 +289,46 @@ treino (e `"heuristic_fallback"` antes dele).
 
 ---
 
+## Cache e resiliência (Redis)
+
+O Redis entra como **dependência opcional** e cobre três papéis:
+
+| Papel | O que resolve |
+|---|---|
+| Cache de leitura | Categorias, detalhe do profissional, listagens e avaliações. A listagem sai de ~16 ms para ~2 ms. |
+| Rate limit distribuído | Com o store em memória, duas instâncias contam janelas separadas e o limite efetivo **dobra** — um furo no `authLimiter`, que existe para conter força bruta. |
+| Circuit breaker do ML | O estado era por processo, então cada instância pagava o timeout do serviço de ML por conta própria antes de proteger o próprio tráfego. |
+
+**Opcional é para valer.** Com `REDIS_ENABLED=false`, ou com o Redis fora do ar, a API
+funciona igual — mais lenta nas listagens e com o limite contado por processo. Isso é
+verificado por teste, e dá para conferir à mão:
+
+```bash
+docker compose stop redis
+curl -s localhost:4000/api/v1/providers -o /dev/null -w '%{http_code} em %{time_total}s\n'
+curl -s localhost:4000/api/v1/health/ready   # → "degraded", com HTTP 200
+docker compose start redis                   # volta a cachear sozinho, sem reiniciar a API
+```
+
+Três decisões que sustentam isso:
+
+- `enableOfflineQueue: false` no cliente de cache. Com o padrão (`true`), o ioredis
+  enfileira comandos em memória enquanto está desconectado e cada requisição fica
+  pendurada até o timeout — trocaria "sem cache" por "API travada".
+- `passOnStoreError: true` nos limitadores. Um contador indisponível libera a
+  requisição em vez de devolver 500: rejeitar todo o tráfego porque o Redis caiu seria
+  um apagão auto-infligido.
+- O store do rate limit é construído **sob demanda**. O `rate-limit-redis` dispara
+  `SCRIPT LOAD` dentro do construtor, no import do módulo, sem aguardar a promessa — com
+  o Redis fora, essa rejeição derrubava o processo em loop de restart.
+
+Health checks: `/api/v1/health` é liveness e não toca em dependência alguma (é o que o
+Render e o Docker consultam); `/api/v1/health/ready` consulta tudo e só devolve 503
+quando o **Postgres** cai — Redis ou ML fora produzem `degraded` com HTTP 200, porque o
+sistema de fato continua servindo.
+
+---
+
 ## Testes
 
 ```bash
@@ -324,6 +374,9 @@ O `backend/.env.example` é a referência completa. As essenciais:
 | `ML_SERVICE_URL` | não | — | ex.: `http://localhost:8001` |
 | `ML_SERVICE_TOKEN` | condicional | — | obrigatório quando `ML_SERVICE_URL` está definida |
 | `ML_TIMEOUT_MS` | não | `700` | acima disso, degrada para ordenação por nota |
+| `REDIS_ENABLED` | não | `false` | `true` liga cache, rate limit distribuído e breaker compartilhado |
+| `REDIS_URL` | condicional | — | obrigatória quando `REDIS_ENABLED=true` |
+| `REDIS_KEY_PREFIX` | não | `zelo` | isola ambientes que dividem a mesma instância |
 
 Detalhes de rate limit, bcrypt e das variáveis do serviço Python:
 [`docs/SETUP.md`](./docs/SETUP.md#6-variáveis-de-ambiente).

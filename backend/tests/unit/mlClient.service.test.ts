@@ -34,8 +34,8 @@ function mockFetch(impl: jest.Mock) {
   return impl;
 }
 
-beforeEach(() => {
-  resetCircuit();
+beforeEach(async () => {
+  await resetCircuit();
   jest.restoreAllMocks();
 });
 

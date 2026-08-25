@@ -1,4 +1,7 @@
 import { prisma } from '../config/prisma';
+import { env } from '../config/env';
+import { cacheKeys, invalidate, withCache } from './cache.service';
+import { invalidateProviderCaches } from './providers.service';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../errors';
 
 export interface CreateReviewInput {
@@ -48,6 +51,13 @@ export async function createReview(authorId: string, input: CreateReviewInput) {
     }),
   ]);
 
+  // A nota entra no card e no perfil; sem invalidar, o cache serviria a média
+  // anterior por até 5 minutos logo após o cliente avaliar.
+  await Promise.all([
+    invalidateProviderCaches(booking.providerId),
+    invalidate(cacheKeys.reviews(booking.providerId)),
+  ]);
+
   return review;
 }
 
@@ -60,13 +70,17 @@ async function recalcAverage(providerId: string, newRating: number): Promise<num
 }
 
 export async function listReviewsByProvider(providerId: string) {
-  const provider = await prisma.providerProfile.findUnique({ where: { id: providerId } });
-  if (!provider) throw new NotFoundError('Profissional não encontrado');
+  const reviews = await withCache(cacheKeys.reviews(providerId), env.CACHE_TTL_REVIEWS_SEC, async () => {
+    const provider = await prisma.providerProfile.findUnique({ where: { id: providerId } });
+    if (!provider) return undefined;
 
-  return prisma.review.findMany({
-    where: { targetId: provider.userId },
-    include: { author: { select: { id: true, name: true, avatarHue: true } } },
-    orderBy: { createdAt: 'desc' },
-    take: PROVIDER_REVIEWS_LIMIT,
+    return prisma.review.findMany({
+      where: { targetId: provider.userId },
+      include: { author: { select: { id: true, name: true, avatarHue: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: PROVIDER_REVIEWS_LIMIT,
+    });
   });
+  if (!reviews) throw new NotFoundError('Profissional não encontrado');
+  return reviews;
 }

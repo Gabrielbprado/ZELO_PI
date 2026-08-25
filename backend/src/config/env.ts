@@ -35,6 +35,18 @@ const schema = z.object({
   ML_CANDIDATE_LIMIT: z.coerce.number().int().positive().max(200).default(150),
   ML_CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(3),
   ML_CIRCUIT_COOLDOWN_MS: z.coerce.number().int().positive().default(30_000),
+  // Redis. Mesma convenção booleana do PUSH_ENABLED, e desligado por padrão de
+  // propósito: `npm run dev` e a suíte de testes precisam continuar subindo em
+  // uma máquina sem Redis nenhum. Ligá-lo é opt-in.
+  REDIS_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  REDIS_URL: z.string().url().optional(),
+  // Prefixo de todas as chaves. Permite que ambientes diferentes dividam uma
+  // instância (o free tier costuma dar uma só) sem um invalidar o cache do outro.
+  REDIS_KEY_PREFIX: z.string().default('zelo'),
+  CACHE_TTL_CATEGORIES_SEC: z.coerce.number().int().positive().default(3600),
+  CACHE_TTL_PROVIDER_SEC: z.coerce.number().int().positive().default(300),
+  CACHE_TTL_PROVIDER_LIST_SEC: z.coerce.number().int().positive().default(60),
+  CACHE_TTL_REVIEWS_SEC: z.coerce.number().int().positive().default(300),
 }).superRefine((cfg, ctx) => {
   // Um serviço de ranking aberto sem token receberia userId e coordenadas de
   // qualquer um. Se a integração está ligada e apontada para algum lugar, o
@@ -44,6 +56,16 @@ const schema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['ML_SERVICE_TOKEN'],
       message: 'ML_SERVICE_TOKEN é obrigatório quando ML_SERVICE_URL está definida',
+    });
+  }
+
+  // Ligar o Redis sem dizer onde ele está é sempre erro de configuração, e o
+  // sintoma seria silencioso: tudo funcionaria, só que sem cache nenhum.
+  if (cfg.REDIS_ENABLED && !cfg.REDIS_URL) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['REDIS_URL'],
+      message: 'REDIS_URL é obrigatória quando REDIS_ENABLED=true',
     });
   }
 });
