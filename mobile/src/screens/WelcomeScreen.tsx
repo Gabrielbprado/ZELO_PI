@@ -64,7 +64,7 @@ export default function WelcomeScreen() {
             }}
           >
             Cuidamos do que{'\n'}
-            <Text style={{ color: theme.colors.primary }}>importa</Text> em casa.
+            <Text style={{ color: theme.colors.primaryText }}>importa</Text> em casa.
           </Text>
           <Text
             style={{
@@ -110,7 +110,7 @@ export default function WelcomeScreen() {
                 textAlign: 'center',
               }}
             >
-              É profissional? <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Cadastre seu serviço</Text>
+              É profissional? <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>Cadastre seu serviço</Text>
             </Text>
           </Pressable>
           <Text

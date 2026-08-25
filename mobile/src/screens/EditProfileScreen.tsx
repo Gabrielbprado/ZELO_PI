@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AxiosError } from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
+import { avatarBg } from '../theme/colorFns';
 import { useAuth } from '../contexts/AuthContext';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
@@ -15,7 +16,7 @@ const HUES = [10, 30, 60, 90, 130, 170, 200, 220, 260, 290, 320, 350];
 
 export default function EditProfileScreen() {
   const nav = useNavigation();
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
   const { user, setUser } = useAuth();
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
@@ -70,7 +71,7 @@ export default function EditProfileScreen() {
                   onPress={() => setAvatarHue(h)}
                   style={{
                     width: 28, height: 28, borderRadius: 14,
-                    backgroundColor: `hsl(${h}, 70%, 55%)`,
+                    backgroundColor: avatarBg(h, mode),
                     borderWidth: 2,
                     borderColor: avatarHue === h ? theme.colors.text : 'transparent',
                   }}

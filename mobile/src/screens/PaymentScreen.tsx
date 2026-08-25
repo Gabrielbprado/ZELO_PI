@@ -24,7 +24,7 @@ export default function PaymentScreen() {
 
   const methods: { id: PaymentMethod; label: string; icon: React.ReactNode; sub: string }[] = [
     { id: 'pix',  label: 'PIX',    icon: <Smartphone size={20} color={theme.colors.success} />,   sub: 'Aprovação instantânea' },
-    { id: 'card', label: 'Cartão', icon: <CreditCard size={20} color={theme.colors.accentBlue} />, sub: 'Crédito ou débito' },
+    { id: 'card', label: 'Cartão', icon: <CreditCard size={20} color={theme.colors.primary} />, sub: 'Crédito ou débito' },
   ];
 
   useEffect(() => {
@@ -124,7 +124,7 @@ export default function PaymentScreen() {
                     <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>{m.sub}</Text>
                   </View>
                   <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: active ? theme.colors.primaryHi : theme.colors.textTer, backgroundColor: active ? theme.colors.primaryHi : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                    {active && <Check size={12} color="#fff" strokeWidth={3.5} />}
+                    {active && <Check size={12} color={theme.colors.onPrimary} strokeWidth={3.5} />}
                   </View>
                 </Pressable>
               );
@@ -158,7 +158,7 @@ export default function PaymentScreen() {
           </View>
         )}
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.25)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: theme.colors.successBg, borderWidth: 1, borderColor: theme.colors.successBorder }}>
           <ShieldCheck size={14} color={theme.colors.success} />
           <Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: '600' }}>Pagamento criptografado · valor liberado após confirmação</Text>
         </View>

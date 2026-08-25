@@ -1,9 +1,12 @@
 import { useCallback, useState } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MessagesSquare } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonList } from '../components/Skeleton';
 import { Avatar } from '../components/Avatar';
 import { Badge } from '../components/Badge';
 import * as messagesApi from '../api/messages';
@@ -34,21 +37,19 @@ export default function ConversationsScreen() {
         <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '800' }}>Mensagens</Text>
       </View>
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.colors.accentBlue} />
-        </View>
+        <SkeletonList />
       ) : items.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
-          <Text style={{ color: theme.colors.textSec, textAlign: 'center' }}>
-            Sem conversas ainda.{'\n'}Inicie um chat a partir do perfil de um profissional.
-          </Text>
-        </View>
+        <EmptyState
+          icon={<MessagesSquare size={24} color={theme.colors.textSec} />}
+          title="Sem conversas ainda"
+          description="Inicie um chat a partir do perfil de um profissional."
+        />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(c) => c.user?.id ?? Math.random().toString()}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 8 }}
-          refreshControl={<RefreshControl tintColor={theme.colors.accentBlue} refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+          refreshControl={<RefreshControl tintColor={theme.colors.primary} refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
           renderItem={({ item }) =>
             !item.user ? null : (
               <Pressable

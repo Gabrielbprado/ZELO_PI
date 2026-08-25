@@ -56,7 +56,7 @@ export function ProCard({ pro, onPress, reason, compact = false }: ProCardProps)
               borderColor: theme.colors.surface,
             }}
           >
-            <Check size={10} color="#fff" strokeWidth={3.5} />
+            <Check size={10} color={theme.colors.onPrimary} strokeWidth={3.5} />
           </View>
         )}
       </View>
@@ -86,7 +86,7 @@ export function ProCard({ pro, onPress, reason, compact = false }: ProCardProps)
               marginBottom: 8,
             }}
           >
-            <Text numberOfLines={1} style={{ color: theme.colors.primary, fontSize: 11, fontWeight: '700' }}>
+            <Text numberOfLines={1} style={{ color: theme.colors.primaryText, fontSize: 11, fontWeight: '700' }}>
               {reason}
             </Text>
           </View>

@@ -78,7 +78,7 @@ jobs:
           git diff --exit-code contracts/
 
   mobile:
-    name: Mobile — typecheck
+    name: Mobile — typecheck, cores e contraste
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -97,3 +97,11 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      # O app estiliza 100% inline; sem estes dois passos, nada impede uma cor literal
+      # (ou um par ilegível) de entrar — o typecheck não tem opinião sobre cor.
+      - name: Cores fora do tema
+        run: npm run check:colors
+
+      - name: Contraste WCAG da paleta
+        run: npm run check:contrast

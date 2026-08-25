@@ -48,7 +48,7 @@ export default function BookingDetailScreen() {
   if (!booking) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={theme.colors.accentBlue} />
+        <ActivityIndicator color={theme.colors.primary} />
       </View>
     );
   }
@@ -106,7 +106,7 @@ export default function BookingDetailScreen() {
           <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>{booking.title}</Text>
           {booking.description && <Text style={{ color: theme.colors.textSec, fontSize: 13, lineHeight: 19 }}>{booking.description}</Text>}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
-            <MapPin size={14} color={theme.colors.accentBlue} />
+            <MapPin size={14} color={theme.colors.primary} />
             <Text style={{ color: theme.colors.text, fontSize: 13 }}>{booking.address}</Text>
           </View>
           <Text style={{ color: theme.colors.textTer, fontSize: 11, marginTop: 4 }}>
@@ -121,7 +121,7 @@ export default function BookingDetailScreen() {
           </View>
         )}
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.25)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: theme.colors.successBg, borderWidth: 1, borderColor: theme.colors.successBorder }}>
           <ShieldCheck size={14} color={theme.colors.success} />
           <Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: '600' }}>Garantia de 90 dias em todos os serviços</Text>
         </View>

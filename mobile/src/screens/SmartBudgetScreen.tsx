@@ -145,7 +145,7 @@ export default function SmartBudgetScreen() {
         </View>
         {computing || !result ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={theme.colors.accentBlue} />
+            <ActivityIndicator color={theme.colors.primary} />
             <Text style={{ color: theme.colors.textSec, marginTop: 12 }}>Calculando...</Text>
           </View>
         ) : (
@@ -180,7 +180,7 @@ export default function SmartBudgetScreen() {
                 ))}
               </View>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.25)', marginTop: 12, alignSelf: 'stretch' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: theme.colors.successBg, borderWidth: 1, borderColor: theme.colors.successBorder, marginTop: 12, alignSelf: 'stretch' }}>
                 <ShieldCheck size={14} color={theme.colors.success} />
                 <Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: '600' }}>Garantia de 90 dias em todos os serviços</Text>
               </View>
@@ -236,7 +236,7 @@ export default function SmartBudgetScreen() {
               onPress={() => pickOption(o.id)}
               style={({ pressed }) => ({
                 padding: 16, borderRadius: theme.radius.lg,
-                backgroundColor: selected ? 'rgba(43,77,184,0.18)' : theme.colors.surface,
+                backgroundColor: selected ? theme.colors.primaryGlow : theme.colors.surface,
                 borderWidth: 1.5, borderColor: selected ? theme.colors.primaryHi : theme.colors.hairline,
                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                 transform: [{ scale: pressed ? 0.98 : 1 }],
@@ -249,12 +249,12 @@ export default function SmartBudgetScreen() {
               <View
                 style={{
                   width: 24, height: 24, borderRadius: 12,
-                  borderWidth: 2, borderColor: selected ? theme.colors.primaryHi : 'rgba(255,255,255,0.2)',
+                  borderWidth: 2, borderColor: selected ? theme.colors.primaryHi : theme.colors.hairline2,
                   backgroundColor: selected ? theme.colors.primaryHi : 'transparent',
                   alignItems: 'center', justifyContent: 'center',
                 }}
               >
-                {selected && <Check size={12} color="#fff" strokeWidth={3.5} />}
+                {selected && <Check size={12} color={theme.colors.onPrimary} strokeWidth={3.5} />}
               </View>
             </Pressable>
           );

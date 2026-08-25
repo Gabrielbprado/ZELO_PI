@@ -95,7 +95,7 @@ export default function EmergencyScreen() {
 
           <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 16, borderWidth: 1, borderColor: theme.colors.hairline, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: theme.colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-              <Clock size={20} color={theme.colors.accentBlue} />
+              <Clock size={20} color={theme.colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.colors.text, fontWeight: '700' }}>ETA estimado: {result.etaMin} min</Text>
@@ -103,7 +103,7 @@ export default function EmergencyScreen() {
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.25)' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: theme.colors.successBg, borderWidth: 1, borderColor: theme.colors.successBorder }}>
             <ShieldCheck size={14} color={theme.colors.success} />
             <Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: '600' }}>Profissional verificado · garantia de 90 dias</Text>
           </View>
@@ -152,11 +152,11 @@ export default function EmergencyScreen() {
                   onPress={() => setPicked(c)}
                   style={{
                     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
-                    backgroundColor: active ? theme.colors.primary : theme.colors.surface,
+                    backgroundColor: active ? theme.colors.primaryDeep : theme.colors.surface,
                     borderWidth: 1.5, borderColor: active ? theme.colors.primaryHi : theme.colors.hairline,
                   }}
                 >
-                  <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>{c.name}</Text>
+                  <Text style={{ color: active ? theme.colors.onPrimary : theme.colors.text, fontSize: 12, fontWeight: '600' }}>{c.name}</Text>
                 </Pressable>
               );
             })}
@@ -164,22 +164,22 @@ export default function EmergencyScreen() {
         </View>
 
         <View style={{ marginTop: 32, width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}>
-          <Animated.View style={[{ position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(239,68,68,0.15)' }, pulseStyle()]} />
-          <Animated.View style={[{ position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(239,68,68,0.18)' }, pulseStyle()]} />
+          <Animated.View style={[{ position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: theme.colors.dangerBg }, pulseStyle()]} />
+          <Animated.View style={[{ position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: theme.colors.dangerBorder }, pulseStyle()]} />
           <Pressable
             onPress={startMatch}
             disabled={!picked}
             style={({ pressed }) => ({
               width: 140, height: 140, borderRadius: 70,
-              backgroundColor: theme.colors.danger,
+              backgroundColor: theme.colors.dangerDeep,
               alignItems: 'center', justifyContent: 'center',
               opacity: picked ? 1 : 0.5,
               shadowColor: theme.colors.danger, shadowOpacity: 0.5, shadowRadius: 20,
               transform: [{ scale: pressed ? 0.95 : 1 }],
             })}
           >
-            <Zap size={28} color="#fff" fill="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 2, marginTop: 6 }}>SOS</Text>
+            <Zap size={28} color={theme.colors.onDanger} fill={theme.colors.onDanger} />
+            <Text style={{ color: theme.colors.onDanger, fontWeight: '800', fontSize: 16, letterSpacing: 2, marginTop: 6 }}>SOS</Text>
           </Pressable>
         </View>
 
@@ -190,7 +190,7 @@ export default function EmergencyScreen() {
         <View style={{ marginTop: 28, gap: 10, width: '100%' }}>
           {[
             { i: <ShieldCheck size={14} color={theme.colors.success} />, t: 'Apenas profissionais verificados' },
-            { i: <Clock size={14} color={theme.colors.accentBlue} />,    t: 'Tempo médio de chegada: 24 min' },
+            { i: <Clock size={14} color={theme.colors.primary} />,    t: 'Tempo médio de chegada: 24 min' },
             { i: <Check size={14} color={theme.colors.success} strokeWidth={3} />, t: 'Pague só após o serviço' },
           ].map((r, i) => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.hairline }}>
@@ -225,12 +225,12 @@ function Matching({ categoryName }: { categoryName: string }) {
           }}
         />
         <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-          <Search size={36} color="#fff" />
+          <Search size={36} color={theme.colors.onPrimary} />
         </View>
       </View>
       <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '700' }}>Procurando profissional...</Text>
       <Text style={{ color: theme.colors.textSec, fontSize: 13, marginTop: 4 }}>{categoryName}</Text>
-      <ActivityIndicator color={theme.colors.accentBlue} style={{ marginTop: 24 }} />
+      <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 24 }} />
     </SafeAreaView>
   );
 }

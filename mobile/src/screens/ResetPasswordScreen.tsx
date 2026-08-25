@@ -82,7 +82,7 @@ export default function ResetPasswordScreen() {
                       alignItems: 'center', justifyContent: 'center',
                     }}
                   >
-                    {ok && <Check size={11} color="#fff" strokeWidth={3.5} />}
+                    {ok && <Check size={11} color={theme.colors.onPrimary} strokeWidth={3.5} />}
                   </View>
                   <Text style={{ color: ok ? theme.colors.success : theme.colors.textSec, fontSize: 12 }}>{r.label}</Text>
                 </View>

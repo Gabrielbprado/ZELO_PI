@@ -48,7 +48,7 @@ export default function ProfileScreen() {
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 17 }}>{user?.name}</Text>
             <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>{user?.email}</Text>
-            <Text style={{ color: theme.colors.accentBlue, fontSize: 11, marginTop: 4, fontWeight: '700' }}>
+            <Text style={{ color: theme.colors.primaryText, fontSize: 11, marginTop: 4, fontWeight: '700' }}>
               {user?.role === 'PROVIDER' ? 'PROFISSIONAL' : 'CLIENTE'}
             </Text>
           </View>
@@ -85,7 +85,7 @@ export default function ProfileScreen() {
             flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
             paddingVertical: 14, borderRadius: theme.radius.lg,
             backgroundColor: theme.colors.dangerBg,
-            borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
+            borderWidth: 1, borderColor: theme.colors.dangerBorder,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >

@@ -130,7 +130,7 @@ export function HomeTutorial({ visible, onClose }: Props) {
                 justifyContent: 'center',
               }}
             >
-              <Icon size={26} color="#fff" strokeWidth={2.2} />
+              <Icon size={26} color={theme.colors.onPrimary} strokeWidth={2.2} />
             </View>
             <Text
               style={{

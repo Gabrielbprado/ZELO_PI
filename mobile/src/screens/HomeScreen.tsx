@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MapPin, Bell, Search, Zap, ChevronRight, Star, Sparkles, ArrowUpRight } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { categoryBg, categoryFg } from '../theme/colorFns';
 import { Avatar } from '../components/Avatar';
 import { ProCard } from '../components/ProCard';
 import { CategoryIcon } from '../components/CategoryIcon';
@@ -19,7 +20,7 @@ import type { AppStackParamList } from '../navigation/types';
 
 export default function HomeScreen() {
   const nav = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
   const { user } = useAuth();
   const { status: onboardingStatus, markSeen } = useHomeOnboarding();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -162,7 +163,7 @@ export default function HomeScreen() {
             onPress={() => nav.navigate('SmartBudget')}
             style={({ pressed }) => ({
               flex: 1,
-              backgroundColor: theme.colors.primary,
+              backgroundColor: theme.colors.primaryDeep,
               borderRadius: 18,
               padding: 18,
               minHeight: 132,
@@ -171,14 +172,14 @@ export default function HomeScreen() {
             })}
           >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Sparkles size={22} color="#fff" strokeWidth={2.2} />
-              <ArrowUpRight size={18} color="rgba(255,255,255,0.7)" strokeWidth={2.2} />
+              <Sparkles size={22} color={theme.colors.onPrimary} strokeWidth={2.2} />
+              <ArrowUpRight size={18} color={theme.colors.onPrimarySec} strokeWidth={2.2} />
             </View>
             <View>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: -0.4 }}>
+              <Text style={{ color: theme.colors.onPrimary, fontWeight: '700', fontSize: 16, letterSpacing: -0.4 }}>
                 Orçamento
               </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.78)', fontSize: 12, marginTop: 2 }}>
+              <Text style={{ color: theme.colors.onPrimarySec, fontSize: 12, marginTop: 2 }}>
                 Estime em 4 toques
               </Text>
             </View>
@@ -209,8 +210,8 @@ export default function HomeScreen() {
               >
                 <Zap size={15} color={theme.colors.danger} fill={theme.colors.danger} strokeWidth={2} />
               </View>
-              <View style={{ backgroundColor: theme.colors.danger, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 10, letterSpacing: 0.8 }}>SOS</Text>
+              <View style={{ backgroundColor: theme.colors.dangerDeep, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 }}>
+                <Text style={{ color: theme.colors.onDanger, fontWeight: '800', fontSize: 10, letterSpacing: 0.8 }}>SOS</Text>
               </View>
             </View>
             <View>
@@ -249,9 +250,7 @@ export default function HomeScreen() {
                     width: 38,
                     height: 38,
                     borderRadius: 12,
-                    backgroundColor: theme.mode === 'dark'
-                      ? `hsla(${c.hue}, 40%, 55%, 0.18)`
-                      : `hsla(${c.hue}, 60%, 45%, 0.12)`,
+                    backgroundColor: categoryBg(c.hue, mode),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -259,7 +258,7 @@ export default function HomeScreen() {
                   <CategoryIcon
                     iconKey={c.iconKey}
                     size={20}
-                    color={theme.mode === 'dark' ? `hsl(${c.hue}, 70%, 72%)` : `hsl(${c.hue}, 55%, 38%)`}
+                    color={categoryFg(c.hue, mode)}
                   />
                 </View>
                 <Text

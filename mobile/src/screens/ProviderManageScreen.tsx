@@ -108,7 +108,7 @@ export default function ProviderManageScreen() {
   if (!profile) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.bg }}>
-        <ActivityIndicator color={theme.colors.accentBlue} />
+        <ActivityIndicator color={theme.colors.primary} />
       </View>
     );
   }
@@ -130,7 +130,7 @@ export default function ProviderManageScreen() {
               <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Disponível para serviços</Text>
               <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>Desative se estiver de folga.</Text>
             </View>
-            <Switch value={available} onValueChange={setAvailable} trackColor={{ false: theme.colors.surface2, true: theme.colors.primaryHi }} thumbColor="#fff" />
+            <Switch value={available} onValueChange={setAvailable} trackColor={{ false: theme.colors.surface2, true: theme.colors.primaryHi }} thumbColor={theme.colors.onPrimary} />
           </View>
 
           {/* Bio */}
@@ -187,11 +187,11 @@ export default function ProviderManageScreen() {
                     onPress={() => toggleCat(c.id)}
                     style={{
                       paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
-                      backgroundColor: active ? theme.colors.primary : theme.colors.surface,
+                      backgroundColor: active ? theme.colors.primaryDeep : theme.colors.surface,
                       borderWidth: 1.5, borderColor: active ? theme.colors.primaryHi : theme.colors.hairline,
                     }}
                   >
-                    <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>{c.name}</Text>
+                    <Text style={{ color: active ? theme.colors.onPrimary : theme.colors.text, fontSize: 12, fontWeight: '600' }}>{c.name}</Text>
                   </Pressable>
                 );
               })}

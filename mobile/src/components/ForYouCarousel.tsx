@@ -129,7 +129,7 @@ export function ForYouCarousel({ onOpenProvider, onSeeAll, refreshKey = 0 }: Pro
             accessibilityRole="button"
             accessibilityLabel="Tentar carregar recomendações novamente"
           >
-            <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700' }}>
+            <Text style={{ color: theme.colors.primaryText, fontSize: 13, fontWeight: '700' }}>
               Tentar de novo
             </Text>
           </Pressable>

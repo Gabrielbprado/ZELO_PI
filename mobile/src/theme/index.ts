@@ -10,7 +10,15 @@ export const fontWeights = {
   extra:    '800' as const,
 };
 
+/** O que o tema efetivamente renderiza. */
 export type ThemeMode = 'light' | 'dark';
+
+/**
+ * O que o usuário escolheu. `'system'` acompanha a preferência do SO; os outros dois a
+ * sobrescrevem. A distinção entre preferência e modo resolvido existe porque o app
+ * precisa lembrar "siga o sistema" — e não o valor que o sistema tinha na hora da escolha.
+ */
+export type ThemePreference = ThemeMode | 'system';
 
 export interface Theme {
   mode: ThemeMode;
@@ -23,6 +31,5 @@ export interface Theme {
 export const darkTheme: Theme  = { mode: 'dark',  colors: darkPalette,  radius, spacing, fonts: fontWeights };
 export const lightTheme: Theme = { mode: 'light', colors: lightPalette, radius, spacing, fonts: fontWeights };
 
-// Compatibilidade — `theme` antigo. Cores estáticas no modo escuro (default).
-// Telas novas devem usar useTheme() para serem theme-aware.
-export const theme = darkTheme;
+/** Tema padrão do produto. Telas devem usar `useTheme()` — este export é a âncora do default. */
+export const defaultTheme = lightTheme;

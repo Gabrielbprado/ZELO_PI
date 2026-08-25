@@ -1,9 +1,12 @@
 import { useCallback, useState } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CalendarClock } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonList } from '../components/Skeleton';
 import { Avatar } from '../components/Avatar';
 import { Badge } from '../components/Badge';
 import { useAuth } from '../contexts/AuthContext';
@@ -61,21 +64,21 @@ export default function BookingsScreen() {
       </View>
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.colors.accentBlue} />
-        </View>
+        <SkeletonList />
       ) : items.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
-          <Text style={{ color: theme.colors.textSec, textAlign: 'center' }}>
-            Sem agendamentos por aqui ainda.{'\n'}Explore o início para contratar um profissional.
-          </Text>
-        </View>
+        <EmptyState
+          icon={<CalendarClock size={24} color={theme.colors.textSec} />}
+          title="Nenhum agendamento por aqui"
+          description={user?.role === 'PROVIDER'
+            ? 'Assim que um cliente solicitar um serviço, ele aparece nesta lista.'
+            : 'Explore o início para contratar um profissional.'}
+        />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(b) => b.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 10 }}
-          refreshControl={<RefreshControl tintColor={theme.colors.accentBlue} refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={<RefreshControl tintColor={theme.colors.primary} refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => {
             const other =
               user?.role === 'PROVIDER'

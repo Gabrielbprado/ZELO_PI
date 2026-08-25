@@ -101,11 +101,11 @@ export default function BookingScreen() {
                     onPress={() => setUrgency(u.id)}
                     style={{
                       paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999,
-                      backgroundColor: active ? theme.colors.primary : theme.colors.surface,
+                      backgroundColor: active ? theme.colors.primaryDeep : theme.colors.surface,
                       borderWidth: 1.5, borderColor: active ? theme.colors.primaryHi : theme.colors.hairline,
                     }}
                   >
-                    <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600' }}>{u.label}</Text>
+                    <Text style={{ color: active ? theme.colors.onPrimary : theme.colors.text, fontSize: 12, fontWeight: '600' }}>{u.label}</Text>
                   </Pressable>
                 );
               })}

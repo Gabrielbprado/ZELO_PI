@@ -50,7 +50,7 @@ function TabsNavigator() {
           height: 64,
           paddingBottom: 8,
         },
-        tabBarActiveTintColor: theme.colors.accentBlue,
+        tabBarActiveTintColor: theme.colors.primaryText,
         tabBarInactiveTintColor: theme.colors.textSec,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
@@ -86,7 +86,7 @@ export function RootNavigator() {
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.bg }}>
-        <ActivityIndicator color={theme.colors.accentBlue} />
+        <ActivityIndicator color={theme.colors.primary} />
       </View>
     );
   }

@@ -19,7 +19,7 @@ export function Button({ onPress, children, variant = 'primary', loading, disabl
     primary:   { bg: theme.colors.text,     fg: theme.colors.bg,   borderColor: 'transparent' },
     secondary: { bg: 'transparent',         fg: theme.colors.text, borderColor: theme.colors.hairline2 },
     ghost:     { bg: 'transparent',         fg: theme.colors.text, borderColor: 'transparent' },
-    danger:    { bg: theme.colors.danger,   fg: '#fff',            borderColor: 'transparent' },
+    danger:    { bg: theme.colors.dangerDeep, fg: theme.colors.onDanger, borderColor: 'transparent' },
   }[variant];
 
   return (

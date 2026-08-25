@@ -2,24 +2,52 @@ import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Star, MapPin, ChevronDown } from 'lucide-react-native';
+import { Star, MapPin, TrendingUp, TrendingDown } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from '../components/Avatar';
 import { Badge } from '../components/Badge';
 import { useAuth } from '../contexts/AuthContext';
 import * as bookingsApi from '../api/bookings';
+import * as providerSelfApi from '../api/providerSelf';
 import type { Booking } from '../types';
+import type { ProviderMe } from '../api/providerSelf';
+
+/** Domingo-primeiro, para casar com `Date.getDay()`. */
+const WEEKDAY_INITIAL = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const addDays = (d: Date, n: number) => {
+  const next = new Date(d);
+  next.setDate(next.getDate() + n);
+  return next;
+};
+
+/** Valor efetivamente recebido: o preço final quando existe, senão o estimado. */
+const bookingValue = (b: Booking) => b.priceFinal ?? b.priceEstimate ?? 0;
+
+const sumBetween = (bookings: Booking[], from: Date, to: Date) =>
+  bookings.reduce((acc, b) => {
+    if (!b.completedAt) return acc;
+    const at = new Date(b.completedAt);
+    return at >= from && at < to ? acc + bookingValue(b) : acc;
+  }, 0);
 
 export default function ProviderDashboardScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [profile, setProfile] = useState<ProviderMe | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const r = await bookingsApi.listMyBookings();
-      setBookings(r);
+      // O perfil traz a nota real; sem ele o card de métricas mostra "—" em vez de inventar.
+      const [list, me] = await Promise.all([
+        bookingsApi.listMyBookings(),
+        providerSelfApi.getMyProvider().catch(() => null),
+      ]);
+      setBookings(list);
+      setProfile(me);
     } finally {
       setRefreshing(false);
     }
@@ -29,16 +57,26 @@ export default function ProviderDashboardScreen() {
 
   const today = bookings.filter((b) => ['ACCEPTED', 'IN_PROGRESS', 'REQUESTED'].includes(b.status));
   const completed = bookings.filter((b) => b.status === 'COMPLETED');
-  const earnings = completed.reduce((acc, b) => acc + (b.priceFinal ?? 0), 0);
-  const earningsWeek = [320, 480, 0, 620, 410, 740, earnings || 590];
-  const max = Math.max(...earningsWeek, 1);
-  const days = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
+  const cancelled = bookings.filter((b) => b.status === 'CANCELLED');
+
+  // Janela de 7 dias terminando hoje — os rótulos acompanham as datas reais, então a
+  // barra da direita é sempre hoje, qualquer que seja o dia da semana.
+  const windowDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(new Date()), i - 6));
+  const earningsWeek = windowDays.map((d) => sumBetween(completed, d, addDays(d, 1)));
+  const weekTotal = earningsWeek.reduce((a, b) => a + b, 0);
+  const previousTotal = sumBetween(completed, addDays(windowDays[0], -7), windowDays[0]);
+  const delta = previousTotal > 0 ? Math.round(((weekTotal - previousTotal) / previousTotal) * 100) : null;
+  const maxEarning = Math.max(...earningsWeek, 1);
+
+  const terminal = completed.length + cancelled.length;
+  const completionRate = terminal > 0 ? Math.round((completed.length / terminal) * 100) : null;
+  const hasRating = (profile?.ratingCount ?? 0) > 0;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <ScrollView
         contentContainerStyle={{ paddingBottom: 32 }}
-        refreshControl={<RefreshControl tintColor={theme.colors.accentBlue} refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+        refreshControl={<RefreshControl tintColor={theme.colors.primary} refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
         <View style={{ backgroundColor: theme.colors.headerGradient, paddingBottom: 20 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 }}>
@@ -50,28 +88,44 @@ export default function ProviderDashboardScreen() {
           </View>
 
           <View style={{ paddingHorizontal: 20 }}>
-            <View style={{ borderRadius: theme.radius.lg, padding: 16, backgroundColor: theme.colors.primary }}>
+            <View style={{ borderRadius: theme.radius.lg, padding: 16, backgroundColor: theme.colors.primaryDeep }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <View>
-                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Ganhos da semana</Text>
-                  <Text style={{ color: '#fff', fontSize: 32, fontWeight: '800', marginTop: 4 }}>
-                    R$ {earningsWeek.reduce((a, b) => a + b, 0).toLocaleString('pt-BR')}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: theme.colors.onPrimarySec, fontSize: 12 }}>Ganhos dos últimos 7 dias</Text>
+                  <Text style={{ color: theme.colors.onPrimary, fontSize: 32, fontWeight: '800', marginTop: 4 }}>
+                    R$ {weekTotal.toLocaleString('pt-BR')}
                   </Text>
-                  <View style={{ marginTop: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(34,197,94,0.2)' }}>
-                    <Text style={{ color: '#86EFAC', fontSize: 11, fontWeight: '700' }}>↑ 18%</Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>vs semana passada</Text>
-                  </View>
+                  {delta !== null && (
+                    <View style={{ marginTop: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: theme.radius.pill, backgroundColor: theme.colors.chartTrack }}>
+                      {delta >= 0
+                        ? <TrendingUp size={11} color={theme.colors.onPrimary} />
+                        : <TrendingDown size={11} color={theme.colors.onPrimary} />}
+                      <Text style={{ color: theme.colors.onPrimary, fontSize: 11, fontWeight: '700' }}>
+                        {delta >= 0 ? '+' : ''}{delta}%
+                      </Text>
+                      <Text style={{ color: theme.colors.onPrimarySec, fontSize: 11 }}>vs. 7 dias antes</Text>
+                    </View>
+                  )}
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 999, height: 28 }}>
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Esta semana</Text>
-                  <ChevronDown size={11} color="#fff" />
+                <View style={{ alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, backgroundColor: theme.colors.chartTrack, borderRadius: theme.radius.pill }}>
+                  <Text style={{ color: theme.colors.onPrimary, fontSize: 11, fontWeight: '600' }}>Semana</Text>
                 </View>
               </View>
+
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-end', height: 64, marginTop: 16 }}>
                 {earningsWeek.map((v, i) => (
-                  <View key={i} style={{ flex: 1, gap: 4, alignItems: 'center' }}>
-                    <View style={{ width: '100%', height: (v / max) * 50 + 2, borderRadius: 2, backgroundColor: i === 5 ? '#86EFAC' : 'rgba(255,255,255,0.4)' }} />
-                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '600' }}>{days[i]}</Text>
+                  <View key={windowDays[i].toISOString()} style={{ flex: 1, gap: 4, alignItems: 'center' }}>
+                    <View
+                      style={{
+                        width: '100%',
+                        height: (v / maxEarning) * 50 + 2,
+                        borderRadius: 2,
+                        backgroundColor: i === earningsWeek.length - 1 ? theme.colors.chartBar : theme.colors.chartTrack,
+                      }}
+                    />
+                    <Text style={{ color: theme.colors.onPrimarySec, fontSize: 10, fontWeight: '600' }}>
+                      {WEEKDAY_INITIAL[windowDays[i].getDay()]}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -81,16 +135,20 @@ export default function ProviderDashboardScreen() {
 
         <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginTop: 16 }}>
           {[
-            { v: '4.9', l: 'Avaliação', icon: <Star size={12} color={theme.colors.star} fill={theme.colors.star} /> },
-            { v: String(completed.length), l: 'Trabalhos' },
-            { v: '96%', l: 'Concluídos' },
+            {
+              v: hasRating ? (profile?.ratingAvg ?? 0).toFixed(1) : '—',
+              l: hasRating ? `Avaliação · ${profile?.ratingCount}` : 'Sem avaliações',
+              icon: <Star size={12} color={theme.colors.star} fill={hasRating ? theme.colors.star : 'transparent'} />,
+            },
+            { v: String(profile?.jobsDone ?? completed.length), l: 'Trabalhos' },
+            { v: completionRate !== null ? `${completionRate}%` : '—', l: 'Concluídos' },
           ].map((s, i) => (
             <View key={i} style={{ flex: 1, backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.hairline }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 {s.icon}
                 <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>{s.v}</Text>
               </View>
-              <Text style={{ color: theme.colors.textSec, fontSize: 10, marginTop: 2 }}>{s.l}</Text>
+              <Text numberOfLines={1} style={{ color: theme.colors.textSec, fontSize: 10, marginTop: 2 }}>{s.l}</Text>
             </View>
           ))}
         </View>

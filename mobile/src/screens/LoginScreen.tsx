@@ -92,7 +92,7 @@ export default function LoginScreen() {
           <Text style={{ color: theme.colors.textSec, fontSize: 14 }}>
             Não tem conta?{' '}
             <Text
-              style={{ color: theme.colors.primary, fontWeight: '700' }}
+              style={{ color: theme.colors.primaryText, fontWeight: '700' }}
               onPress={() => nav.navigate('Register', { role: 'CLIENT' })}
             >
               Cadastre-se

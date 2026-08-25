@@ -71,13 +71,13 @@ export default function ProviderListScreen() {
               onPress={() => setActive(f.id)}
               style={{
                 paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
-                backgroundColor: isActive ? theme.colors.primary : theme.colors.surface,
+                backgroundColor: isActive ? theme.colors.primaryDeep : theme.colors.surface,
                 borderWidth: 1, borderColor: isActive ? theme.colors.primaryHi : theme.colors.hairline,
                 flexDirection: 'row', alignItems: 'center', gap: 4,
               }}
             >
-              {f.id === 'verified' && <ShieldCheck size={11} color={isActive ? '#fff' : theme.colors.success} />}
-              <Text style={{ color: isActive ? '#fff' : theme.colors.text, fontSize: 12, fontWeight: '600' }}>{f.label}</Text>
+              {f.id === 'verified' && <ShieldCheck size={11} color={isActive ? theme.colors.onPrimary : theme.colors.success} />}
+              <Text style={{ color: isActive ? theme.colors.onPrimary : theme.colors.text, fontSize: 12, fontWeight: '600' }}>{f.label}</Text>
             </Pressable>
           );
         })}
@@ -93,7 +93,7 @@ export default function ProviderListScreen() {
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.colors.accentBlue} />
+          <ActivityIndicator color={theme.colors.primary} />
         </View>
       ) : (
         <FlatList

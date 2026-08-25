@@ -72,6 +72,7 @@ export interface Booking {
   status: BookingStatus;
   priceEstimate?: number | null;
   priceFinal?: number | null;
+  completedAt?: string | null;
   createdAt: string;
   category?: Category;
   provider?: { id: string; user: { id: string; name: string; avatarHue: number } };

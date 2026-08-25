@@ -36,12 +36,12 @@ export default function NotificationsScreen() {
         </Pressable>
         <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700', flex: 1 }}>Notificações</Text>
         <Pressable onPress={markAll}>
-          <Text style={{ color: theme.colors.accentBlue, fontSize: 13, fontWeight: '600' }}>Marcar tudo</Text>
+          <Text style={{ color: theme.colors.primaryText, fontSize: 13, fontWeight: '600' }}>Marcar tudo</Text>
         </Pressable>
       </View>
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.colors.accentBlue} /></View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View>
       ) : items.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
           <Bell size={48} color={theme.colors.textTer} />
@@ -52,18 +52,18 @@ export default function NotificationsScreen() {
           data={items}
           keyExtractor={(n) => n.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 8 }}
-          refreshControl={<RefreshControl tintColor={theme.colors.accentBlue} refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+          refreshControl={<RefreshControl tintColor={theme.colors.primary} refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
           renderItem={({ item }) => (
             <View
               style={{
                 flexDirection: 'row', gap: 12,
                 padding: 12, borderRadius: theme.radius.md,
-                backgroundColor: item.readAt ? theme.colors.surface : 'rgba(43,77,184,0.08)',
-                borderWidth: 1, borderColor: item.readAt ? theme.colors.hairline : 'rgba(43,77,184,0.25)',
+                backgroundColor: item.readAt ? theme.colors.surface : theme.colors.primaryGlow,
+                borderWidth: 1, borderColor: item.readAt ? theme.colors.hairline : theme.colors.primary,
               }}
             >
               <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: theme.colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-                <Bell size={16} color={theme.colors.accentBlue} />
+                <Bell size={16} color={theme.colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 13 }}>{item.title}</Text>

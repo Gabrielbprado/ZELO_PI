@@ -127,14 +127,16 @@ export default function ChatScreen() {
           contentContainerStyle={{ padding: 16, gap: 8 }}
           renderItem={({ item }) => {
             const mine = item.senderId === user?.id;
-            const fg     = mine ? '#fff' : theme.colors.text;
-            const fgFaint = mine ? 'rgba(255,255,255,0.55)' : theme.colors.textTer;
+            // A bolha própria usa `primaryDeep`, não `primaryHi`: branco sobre o tom
+            // claro do primary fica em ~2,6:1, abaixo de AA para texto de conversa.
+            const fg      = mine ? theme.colors.onPrimary    : theme.colors.text;
+            const fgFaint = mine ? theme.colors.onPrimarySec : theme.colors.textTer;
             return (
               <View
                 style={{
                   alignSelf: mine ? 'flex-end' : 'flex-start',
                   maxWidth: '80%',
-                  backgroundColor: mine ? theme.colors.primaryHi : theme.colors.surface,
+                  backgroundColor: mine ? theme.colors.primaryDeep : theme.colors.surface,
                   borderRadius: 16,
                   borderBottomRightRadius: mine ? 4 : 16,
                   borderBottomLeftRadius:  mine ? 16 : 4,
@@ -171,14 +173,14 @@ export default function ChatScreen() {
             onPress={send}
             style={({ pressed }) => ({
               width: 44, height: 44, borderRadius: 22,
-              backgroundColor: theme.colors.primaryHi,
+              backgroundColor: theme.colors.primaryDeep,
               alignItems: 'center', justifyContent: 'center',
               opacity: text.trim() ? 1 : 0.5,
               transform: [{ scale: pressed ? 0.95 : 1 }],
             })}
             disabled={!text.trim()}
           >
-            <Send size={18} color="#fff" />
+            <Send size={18} color={theme.colors.onPrimary} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>

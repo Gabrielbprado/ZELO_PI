@@ -47,7 +47,7 @@ export default function ForgotPasswordScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, paddingHorizontal: 20 }}>
         {sent ? (
           <View style={{ flex: 1, paddingTop: 32, alignItems: 'center' }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(34,197,94,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.successBg, alignItems: 'center', justifyContent: 'center' }}>
               <MailCheck size={32} color={theme.colors.success} />
             </View>
             <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
@@ -66,7 +66,7 @@ export default function ForgotPasswordScreen() {
               Tenho o token, redefinir agora
             </Button>
             <Pressable onPress={() => nav.navigate('Login')} style={{ marginTop: 12 }}>
-              <Text style={{ color: theme.colors.accentBlue, fontWeight: '600' }}>Voltar para login</Text>
+              <Text style={{ color: theme.colors.primaryText, fontWeight: '600' }}>Voltar para login</Text>
             </Pressable>
           </View>
         ) : (
@@ -86,7 +86,7 @@ export default function ForgotPasswordScreen() {
             {error && <Text style={{ color: theme.colors.danger, fontSize: 13 }}>{error}</Text>}
             <Button loading={loading} onPress={onSubmit} style={{ marginTop: 8 }}>Enviar link</Button>
             <Pressable onPress={() => nav.navigate('ResetPassword')} style={{ alignSelf: 'center', marginTop: 8 }}>
-              <Text style={{ color: theme.colors.accentBlue, fontWeight: '600' }}>Já tenho um token</Text>
+              <Text style={{ color: theme.colors.primaryText, fontWeight: '600' }}>Já tenho um token</Text>
             </Pressable>
           </View>
         )}

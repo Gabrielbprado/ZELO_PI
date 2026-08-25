@@ -92,11 +92,11 @@ export default function RegisterScreen() {
                   borderRadius: 999,
                   borderWidth: 1.5,
                   borderColor: active ? theme.colors.primaryHi : theme.colors.hairline,
-                  backgroundColor: active ? theme.colors.primary : theme.colors.surface,
+                  backgroundColor: active ? theme.colors.primaryDeep : theme.colors.surface,
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ color: theme.colors.text, fontWeight: '700' }}>
+                <Text style={{ color: active ? theme.colors.onPrimary : theme.colors.text, fontWeight: '700' }}>
                   {r === 'CLIENT' ? 'Sou cliente' : 'Sou profissional'}
                 </Text>
               </Pressable>
@@ -134,7 +134,7 @@ export default function RegisterScreen() {
                       alignItems: 'center', justifyContent: 'center',
                     }}
                   >
-                    {ok && <Check size={11} color="#fff" strokeWidth={3.5} />}
+                    {ok && <Check size={11} color={theme.colors.onPrimary} strokeWidth={3.5} />}
                   </View>
                   <Text style={{ color: ok ? theme.colors.success : theme.colors.textSec, fontSize: 12 }}>
                     {r.label}
