@@ -95,7 +95,7 @@ describe('Auth', () => {
   it('refresh rotaciona o token e invalida o antigo', async () => {
     const app = await getApp();
     await request(app).post('/api/v1/auth/register').send({
-      name: 'R', email: 'r@zero.test', password: STRONG_PASSWORD,
+      name: 'Rita', email: 'r@zero.test', password: STRONG_PASSWORD,
     });
     const login = await request(app).post('/api/v1/auth/login').send({ email: 'r@zero.test', password: STRONG_PASSWORD });
     const firstRefresh = login.body.refreshToken;
@@ -125,6 +125,32 @@ describe('Auth', () => {
     // t2 também não funciona mais
     const r2 = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: t2 });
     expect(r2.status).toBe(401);
+  });
+
+  it('token expirado é recusado sem derrubar as outras sessões', async () => {
+    const app = await getApp();
+    await request(app).post('/api/v1/auth/register').send({
+      name: 'Expira', email: 'expira@zero.test', password: STRONG_PASSWORD,
+    });
+
+    // Duas sessões: um celular e um navegador.
+    const celular = await request(app).post('/api/v1/auth/login').send({ email: 'expira@zero.test', password: STRONG_PASSWORD });
+    const navegador = await request(app).post('/api/v1/auth/login').send({ email: 'expira@zero.test', password: STRONG_PASSWORD });
+
+    // O celular ficou semanas sem abrir o app: seu refresh venceu.
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'expira@zero.test' } });
+    const tokens = await prisma.refreshToken.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'asc' } });
+    await prisma.refreshToken.update({
+      where: { id: tokens[0].id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const vencido = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: celular.body.refreshToken });
+    expect(vencido.status).toBe(401);
+
+    // Expirar não é sinal de roubo: a sessão do navegador continua válida.
+    const outro = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: navegador.body.refreshToken });
+    expect(outro.status).toBe(200);
   });
 
   it('GET /auth/me sem token retorna 401', async () => {

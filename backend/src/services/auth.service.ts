@@ -147,8 +147,12 @@ export async function rotateRefreshToken(
 
   const isExpired = record ? record.expiresAt < new Date() : false;
   if (!record || record.revokedAt || isExpired) {
-    if (record && !record.revokedAt) {
-      // Reuso de token rotacionado → revoga toda a árvore por segurança
+    // O sinal de roubo é um token JÁ REVOGADO sendo reapresentado: o dono legítimo
+    // rotacionou, então quem ainda tem a versão antiga a copiou. Só esse caso derruba a
+    // árvore. Um token apenas expirado não é evidência de nada — é o que acontece com
+    // quem ficou uma semana sem abrir o app, e deslogar essa pessoa de todos os
+    // aparelhos seria punir o uso normal.
+    if (record?.revokedAt) {
       await prisma.refreshToken.updateMany({
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: new Date() },

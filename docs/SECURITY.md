@@ -12,7 +12,9 @@ Lista das proteções aplicadas no backend e mobile, e quais testes automatizado
 ## Autenticação
 - **Access token JWT** (HS256, default 15 min) com payload mínimo (`sub`, `role`, `email`)
 - **Refresh token opaco** (64 bytes aleatórios) — armazenado no banco apenas como SHA-256, nunca em plaintext
-- Rotação em **cada uso** do refresh; reuso de token revogado **invalida toda a árvore** (defesa contra roubo)
+- Rotação em **cada uso** do refresh; reuso de token **já revogado** invalida toda a
+  árvore (defesa contra roubo). Um token apenas **expirado** é recusado sem derrubar as
+  outras sessões — expirar é uso normal, não evidência de roubo
 - `logout` revoga o refresh token na origem
 - Testes: `tests/integration/auth.test.ts` (refresh rotation + reuse detection)
 
