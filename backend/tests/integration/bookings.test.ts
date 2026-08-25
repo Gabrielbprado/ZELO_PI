@@ -25,19 +25,19 @@ describe('Bookings + RBAC', () => {
     const { provider, category } = await createProvider();
     const c1 = await authedAgent('CLIENT');
     const c2 = await authedAgent('CLIENT');
-    await c1.post('/api/v1/bookings').send({ providerId: provider.id, categoryId: category.id, title: 'A', address: 'A' });
-    await c2.post('/api/v1/bookings').send({ providerId: provider.id, categoryId: category.id, title: 'B', address: 'B' });
+    await c1.post('/api/v1/bookings').send({ providerId: provider.id, categoryId: category.id, title: 'Torneira A', address: 'Rua A, 100' });
+    await c2.post('/api/v1/bookings').send({ providerId: provider.id, categoryId: category.id, title: 'Torneira B', address: 'Rua B, 200' });
     const list = await c1.get('/api/v1/bookings/mine');
     expect(list.status).toBe(200);
     expect(list.body.items).toHaveLength(1);
-    expect(list.body.items[0].title).toBe('A');
+    expect(list.body.items[0].title).toBe('Torneira A');
   });
 
   it('cliente não consegue ACEITAR um booking (apenas prestador)', async () => {
     const { provider, category, user: providerUser } = await createProvider();
     const client = await authedAgent('CLIENT');
     const create = await client.post('/api/v1/bookings').send({
-      providerId: provider.id, categoryId: category.id, title: 'X', address: 'X',
+      providerId: provider.id, categoryId: category.id, title: 'Torneira X', address: 'Rua X, 300',
     });
 
     const app = await getApp();
@@ -59,7 +59,7 @@ describe('Bookings + RBAC', () => {
     const c1 = await authedAgent('CLIENT');
     const c2 = await authedAgent('CLIENT');
     const create = await c1.post('/api/v1/bookings').send({
-      providerId: provider.id, categoryId: category.id, title: 'X', address: 'X',
+      providerId: provider.id, categoryId: category.id, title: 'Torneira X', address: 'Rua X, 300',
     });
     const res = await c2.get(`/api/v1/bookings/${create.body.id}`);
     expect(res.status).toBe(403);
@@ -69,7 +69,7 @@ describe('Bookings + RBAC', () => {
     const { provider } = await createProvider();
     const client = await authedAgent('CLIENT');
     const res = await client.post('/api/v1/bookings').send({
-      providerId: provider.id, categoryId: 'inexistente', title: 'X', address: 'X',
+      providerId: provider.id, categoryId: 'inexistente', title: 'Torneira X', address: 'Rua X, 300',
     });
     expect(res.status).toBe(404);
   });
@@ -77,7 +77,7 @@ describe('Bookings + RBAC', () => {
   it('rejeita providerId não-UUID via Zod (400)', async () => {
     const client = await authedAgent('CLIENT');
     const res = await client.post('/api/v1/bookings').send({
-      providerId: 'not-a-uuid', categoryId: 'plumb', title: 'X', address: 'X',
+      providerId: 'not-a-uuid', categoryId: 'plumb', title: 'Torneira X', address: 'Rua X, 300',
     });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
