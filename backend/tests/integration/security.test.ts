@@ -31,14 +31,25 @@ describe('headers de segurança e CORS', () => {
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
   });
 
-  it('payload acima do limite retorna 413', async () => {
+  it('payload acima do limite retorna 413, e não 500', async () => {
     const app = await getApp();
     const big = 'x'.repeat(2 * 1024 * 1024);
     const res = await request(app)
       .post('/api/v1/auth/register')
       .set('Content-Type', 'application/json')
       .send(`{"a":"${big}"}`);
-    expect([400, 413]).toContain(res.status);
+    expect(res.status).toBe(413);
+    expect(res.body.error.code).toBe('PAYLOAD_TOO_LARGE');
+  });
+
+  it('JSON malformado retorna 400, e não 500', async () => {
+    const app = await getApp();
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .set('Content-Type', 'application/json')
+      .send('{"email": "a@b.c", ');
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('BAD_REQUEST');
   });
 
   it('rota inexistente retorna 404 com formato padrão', async () => {
