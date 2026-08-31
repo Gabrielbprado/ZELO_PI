@@ -35,6 +35,8 @@ async function flushCache(): Promise<void> {
 export async function truncateAll() {
   // ordem inversa de dependência para satisfazer FKs
   await prisma.$transaction([
+    prisma.outboxEvent.deleteMany(),
+    prisma.processedEvent.deleteMany(),
     prisma.recEvent.deleteMany(),
     prisma.review.deleteMany(),
     prisma.message.deleteMany(),

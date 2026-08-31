@@ -83,12 +83,28 @@ jobs:
           --health-timeout 3s
           --health-retries 10
 
+      # Com o RabbitMQ presente, a suíte exercita o CICLO COMPLETO do barramento:
+      # outbox → relay → consumidor persiste a notificação. Sem ele, esses testes se
+      # pulam e só o outbox transacional (que não precisa de broker) é verificado.
+      # É o caminho mais complexo — logo, o que o CI deve cobrir.
+      rabbitmq:
+        image: rabbitmq:3-management-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zero_marketplace_test?schema=public
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zero_marketplace_test?schema=public
       REDIS_ENABLED: 'true'
       REDIS_URL: redis://localhost:6379
       REDIS_KEY_PREFIX: zelo-ci
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URL: amqp://guest:guest@localhost:5672
 
     steps:
       - uses: actions/checkout@v4

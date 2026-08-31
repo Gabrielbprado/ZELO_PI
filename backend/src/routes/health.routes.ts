@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../config/prisma';
 import { redisStatus } from '../config/redis';
+import { amqpStatus } from '../config/amqp';
 import { circuitState, isMlConfigured } from '../services/mlClient.service';
 import { env } from '../config/env';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -55,8 +56,15 @@ router.get('/ready', asyncHandler(async (_req, res) => {
   ]);
 
   const redis: Check = { status: redisStatus() === 'ready' ? 'ok' : redisStatus() === 'disabled' ? 'disabled' : 'down' };
+  // RabbitMQ fora do ar é `degraded`, não `down`: os eventos ficam represados no outbox
+  // e são entregues quando ele volta — o produto segue de pé. Mesma regra do Redis.
+  const rabbitmq: Check = ((): Check => {
+    const s = amqpStatus();
+    if (s === 'disabled') return { status: 'disabled' };
+    return s === 'ready' ? { status: 'ok' } : { status: 'degraded', detail: 'broker inacessível; outbox represado' };
+  })();
 
-  const checks = { postgres, redis, ml };
+  const checks = { postgres, redis, rabbitmq, ml };
   const healthy = postgres.status === 'ok';
   const degraded = Object.values(checks).some((c) => c.status === 'down' || c.status === 'degraded');
 

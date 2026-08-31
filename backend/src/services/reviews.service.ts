@@ -2,6 +2,8 @@ import { prisma } from '../config/prisma';
 import { env } from '../config/env';
 import { cacheKeys, invalidate, withCache } from './cache.service';
 import { invalidateProviderCaches } from './providers.service';
+import { recordEvent } from '../events/domainBus';
+import { ROUTING_KEYS } from '../events/types';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../errors';
 
 export interface CreateReviewInput {
@@ -32,8 +34,8 @@ export async function createReview(authorId: string, input: CreateReviewInput) {
   const targetUserId = booking.provider.userId;
   const nextAverage = await recalcAverage(booking.providerId, input.rating);
 
-  const [review] = await prisma.$transaction([
-    prisma.review.create({
+  const review = await prisma.$transaction(async (tx) => {
+    const created = await tx.review.create({
       data: {
         bookingId: input.bookingId,
         authorId,
@@ -41,15 +43,24 @@ export async function createReview(authorId: string, input: CreateReviewInput) {
         rating: input.rating,
         comment: input.comment,
       },
-    }),
-    prisma.providerProfile.update({
+    });
+    await tx.providerProfile.update({
       where: { id: booking.providerId },
       data: {
         ratingAvg: { set: nextAverage },
         ratingCount: { increment: 1 },
       },
-    }),
-  ]);
+    });
+    await recordEvent(tx, ROUTING_KEYS.REVIEW_CREATED, {
+      reviewId: created.id,
+      bookingId: input.bookingId,
+      authorId,
+      targetUserId,
+      providerId: booking.providerId,
+      rating: input.rating,
+    });
+    return created;
+  });
 
   // A nota entra no card e no perfil; sem invalidar, o cache serviria a média
   // anterior por até 5 minutos logo após o cliente avaliar.

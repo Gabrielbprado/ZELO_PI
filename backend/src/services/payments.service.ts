@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { prisma } from '../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
 import { pushToUser } from './notifications.service';
+import { recordEvent } from '../events/domainBus';
+import { ROUTING_KEYS } from '../events/types';
 
 export type PaymentMethod = 'pix' | 'card';
 
@@ -67,9 +69,23 @@ export async function confirmPayment(userId: string, bookingId: string) {
   if (payment.booking.clientId !== userId) throw new ForbiddenError('Acesso negado');
   if (payment.status === 'PAID') return payment;
 
-  const updated = await prisma.payment.update({
-    where: { id: payment.id },
-    data: { status: 'PAID' },
+  // `payment.confirmed` é o evento de maior risco do sistema: na Onda 7 ele vira
+  // lançamento no ledger. Por isso ele nasce DENTRO da transação que confirma o
+  // pagamento — o outbox garante que confirmar e emitir são atômicos, e que dinheiro
+  // nunca "some" entre um commit no Postgres e uma falha ao publicar no broker.
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: 'PAID' },
+    });
+    await recordEvent(tx, ROUTING_KEYS.PAYMENT_CONFIRMED, {
+      paymentId: u.id,
+      bookingId,
+      clientId: payment.booking.clientId,
+      providerUserId: payment.booking.provider.userId,
+      amount: u.amount,
+    });
+    return u;
   });
 
   // Notify the provider that they got paid.

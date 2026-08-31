@@ -351,3 +351,32 @@ model AuditLog {
 
   @@index([userId, createdAt])
 }
+
+/// Outbox transacional. O ponto do padrão: o evento de domínio é gravado na MESMA
+/// transação da mudança de estado que o originou, então ou os dois persistem ou
+/// nenhum. Sem isto, `payment.confirmed` poderia commitar no Postgres e falhar ao
+/// publicar no RabbitMQ — e como esse evento vira lançamento no ledger (Onda 7),
+/// dinheiro sumiria. O relay lê as linhas com `publishedAt IS NULL`, publica com
+/// confirm e marca `publishedAt`. O índice parcial dessa condição vive na migration
+/// (Prisma não expressa `WHERE` em índice), e é o que mantém o polling barato mesmo
+/// com a tabela crescendo para sempre.
+model OutboxEvent {
+  id          String    @id @default(uuid())
+  routingKey  String
+  payload     Json
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+}
+
+/// Deduplicação de consumo. Cada consumidor registra aqui os eventos que já tratou;
+/// a chave composta permite que consumidores diferentes (notificações, analytics,
+/// ledger) processem o MESMO evento uma vez cada. É o que torna o consumo idempotente
+/// diante da entrega "at-least-once" do broker e das reentregas da DLQ.
+model ProcessedEvent {
+  consumer    String
+  eventId     String
+  processedAt DateTime @default(now())
+
+  @@id([consumer, eventId])
+}

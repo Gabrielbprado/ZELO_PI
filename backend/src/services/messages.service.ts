@@ -2,6 +2,8 @@ import { prisma } from '../config/prisma';
 import { ForbiddenError, NotFoundError } from '../errors';
 import { realtimeBus } from '../realtime/bus';
 import { pushToUser } from './notifications.service';
+import { recordEvent } from '../events/domainBus';
+import { ROUTING_KEYS } from '../events/types';
 
 export interface SendMessageInput {
   receiverId: string;
@@ -28,24 +30,38 @@ export async function sendMessage(senderId: string, input: SendMessageInput) {
     await assertParticipatesInBooking(input.bookingId, senderId, input.receiverId);
   }
 
-  const message = await prisma.message.create({
-    data: {
+  const preview = input.content.length > MESSAGE_PREVIEW_MAX
+    ? `${input.content.slice(0, MESSAGE_PREVIEW_MAX)}…`
+    : input.content;
+
+  const message = await prisma.$transaction(async (tx) => {
+    const m = await tx.message.create({
+      data: {
+        senderId,
+        receiverId: input.receiverId,
+        bookingId: input.bookingId,
+        content: input.content,
+      },
+    });
+    await recordEvent(tx, ROUTING_KEYS.MESSAGE_CREATED, {
+      messageId: m.id,
       senderId,
       receiverId: input.receiverId,
-      bookingId: input.bookingId,
-      content: input.content,
-    },
+      senderName: sender?.name ?? 'Alguém',
+      preview,
+      bookingId: input.bookingId ?? null,
+    });
+    return m;
   });
 
   // Push to any connected sockets in real time. No-op without the realtime layer.
   realtimeBus.emitMessageCreated(message);
 
-  // OS-level push for the offline/foreground case.
+  // OS-level push for the offline/foreground case. Segue inline nesta onda: o inbox
+  // persistido vem do evento, o push imediato continua daqui (comportamento idêntico).
   await pushToUser(input.receiverId, {
     title: sender ? `Nova mensagem de ${sender.name}` : 'Nova mensagem',
-    body: input.content.length > MESSAGE_PREVIEW_MAX
-      ? `${input.content.slice(0, MESSAGE_PREVIEW_MAX)}…`
-      : input.content,
+    body: preview,
     data: { type: 'MESSAGE', senderId, bookingId: input.bookingId ?? null },
   });
 

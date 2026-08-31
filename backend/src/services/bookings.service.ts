@@ -2,6 +2,8 @@ import { BookingStatus, Role } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
 import { pushToUser } from './notifications.service';
+import { recordEvent } from '../events/domainBus';
+import { ROUTING_KEYS, type RoutingKey } from '../events/types';
 
 export type Urgency = 'EMERGENCY' | 'TODAY' | 'THIS_WEEK' | 'FLEXIBLE';
 export type AllowedBookingStatus = 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
@@ -16,6 +18,9 @@ export interface CreateBookingInput {
   scheduledAt?: string;
   urgency: Urgency;
   priceEstimate?: number;
+  // Presente quando o booking nasceu de um card de recomendação. Viaja no evento
+  // `booking.created` e reabastece o sinal de conversão do recomendador.
+  requestId?: string;
 }
 
 /** Which statuses each role is allowed to apply to a booking. */
@@ -23,6 +28,13 @@ const ALLOWED_STATUS_BY_ROLE: Readonly<Record<Role, ReadonlyArray<BookingStatus>
   PROVIDER: ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
   CLIENT: ['CANCELLED'],
   ADMIN: ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+};
+
+/** Qual evento de domínio cada transição emite. IN_PROGRESS não gera evento. */
+const TRANSITION_EVENT: Partial<Record<AllowedBookingStatus, RoutingKey>> = {
+  ACCEPTED: ROUTING_KEYS.BOOKING_ACCEPTED,
+  COMPLETED: ROUTING_KEYS.BOOKING_COMPLETED,
+  CANCELLED: ROUTING_KEYS.BOOKING_CANCELLED,
 };
 
 const BOOKING_INCLUDE_FULL = {
@@ -41,18 +53,34 @@ export async function createBooking(input: CreateBookingInput) {
   if (!category) throw new NotFoundError('Categoria não encontrada');
   if (!provider.available) throw new BadRequestError('Profissional indisponível no momento');
 
-  return prisma.booking.create({
-    data: {
-      clientId: input.clientId,
-      providerId: input.providerId,
-      categoryId: input.categoryId,
-      title: input.title,
-      description: input.description,
-      address: input.address,
-      scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
-      urgency: input.urgency,
-      priceEstimate: input.priceEstimate,
-    },
+  // Booking e evento nascem na MESMA transação: o `booking.created` só existe se o
+  // booking existe, e vice-versa. É o outbox transacional na sua forma mais simples.
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.create({
+      data: {
+        clientId: input.clientId,
+        providerId: input.providerId,
+        categoryId: input.categoryId,
+        title: input.title,
+        description: input.description,
+        address: input.address,
+        scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
+        urgency: input.urgency,
+        priceEstimate: input.priceEstimate,
+      },
+    });
+
+    await recordEvent(tx, ROUTING_KEYS.BOOKING_CREATED, {
+      bookingId: booking.id,
+      clientId: booking.clientId,
+      providerId: booking.providerId,
+      providerUserId: provider.userId,
+      categoryId: booking.categoryId,
+      title: booking.title,
+      recRequestId: input.requestId ?? null,
+    });
+
+    return booking;
   });
 }
 
@@ -85,17 +113,34 @@ export async function updateBookingStatus(
 
   const completedAt = status === 'COMPLETED' ? new Date() : booking.completedAt;
 
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
-    data: { status, priceFinal, completedAt },
-  });
-
-  if (status === 'COMPLETED') {
-    await prisma.providerProfile.update({
-      where: { id: booking.providerId },
-      data: { jobsDone: { increment: 1 } },
+  // A mudança de status, o incremento de jobsDone e o evento de transição commitam
+  // juntos: o consumidor nunca vê um `booking.completed` cujo booking ainda está em
+  // andamento, nem o contrário.
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.booking.update({
+      where: { id: bookingId },
+      data: { status, priceFinal, completedAt },
     });
-  }
+
+    if (status === 'COMPLETED') {
+      await tx.providerProfile.update({
+        where: { id: booking.providerId },
+        data: { jobsDone: { increment: 1 } },
+      });
+    }
+
+    const key = TRANSITION_EVENT[status];
+    if (key) {
+      await recordEvent(tx, key, {
+        bookingId: u.id,
+        clientId: u.clientId,
+        providerUserId: booking.provider.userId,
+        title: u.title,
+      });
+    }
+
+    return u;
+  });
 
   // Notify the client on the two highest-value transitions.
   if (status === 'ACCEPTED') {

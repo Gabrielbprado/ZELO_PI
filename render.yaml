@@ -74,6 +74,15 @@ services:
         sync: false
       - key: REDIS_KEY_PREFIX
         value: zelo-prod
+      # RabbitMQ. Mesma história do Redis: não há plano gerenciado free no Render.
+      # A URL aponta para um provedor externo com free tier (CloudAMQP) e é
+      # preenchida no dashboard. Com RABBITMQ_ENABLED=false a API sobe normalmente: o
+      # outbox continua sendo gravado dentro das transações, os eventos só ficam
+      # represados até um broker existir — degradação prevista, não falha.
+      - key: RABBITMQ_ENABLED
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false
 
   - type: web
     name: zelo-ml

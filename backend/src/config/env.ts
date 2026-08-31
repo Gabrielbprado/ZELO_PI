@@ -47,6 +47,19 @@ const schema = z.object({
   CACHE_TTL_PROVIDER_SEC: z.coerce.number().int().positive().default(300),
   CACHE_TTL_PROVIDER_LIST_SEC: z.coerce.number().int().positive().default(60),
   CACHE_TTL_REVIEWS_SEC: z.coerce.number().int().positive().default(300),
+  // RabbitMQ. Mesma convenção booleana e mesma disciplina do Redis: dependência
+  // OPCIONAL, desligada por padrão. Com ela off, o outbox continua sendo gravado
+  // (o evento nasce junto da transação, sempre), apenas não há relay publicando —
+  // então `npm run dev` e a suíte sobem sem broker nenhum. Ligá-la é opt-in.
+  RABBITMQ_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  RABBITMQ_URL: z.string().url().optional(),
+  RABBITMQ_EXCHANGE: z.string().default('zelo.events'),
+  // Intervalo do relay do outbox e tamanho do lote por varredura.
+  OUTBOX_RELAY_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+  OUTBOX_RELAY_BATCH: z.coerce.number().int().positive().max(1000).default(100),
+  // Após quantas reentregas um evento vai para a DLQ em vez de voltar para a fila
+  // de retry. Conta a partir do header `x-death` que o RabbitMQ mantém.
+  EVENT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
 }).superRefine((cfg, ctx) => {
   // Um serviço de ranking aberto sem token receberia userId e coordenadas de
   // qualquer um. Se a integração está ligada e apontada para algum lugar, o
@@ -66,6 +79,17 @@ const schema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['REDIS_URL'],
       message: 'REDIS_URL é obrigatória quando REDIS_ENABLED=true',
+    });
+  }
+
+  // Mesma razão do Redis: ligar o barramento sem dizer onde o broker está deixaria
+  // o relay girando em falso, e o sintoma seria mudo — eventos gravados no outbox,
+  // nunca publicados.
+  if (cfg.RABBITMQ_ENABLED && !cfg.RABBITMQ_URL) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['RABBITMQ_URL'],
+      message: 'RABBITMQ_URL é obrigatória quando RABBITMQ_ENABLED=true',
     });
   }
 });

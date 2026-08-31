@@ -4,6 +4,7 @@ import { env } from './config/env';
 import { logger } from './utils/logger';
 import { createRealtime, REALTIME_PATH } from './realtime/io';
 import { getRedis, disconnectRedis } from './config/redis';
+import { startEvents, stopEvents } from './events';
 
 const app = createApp();
 const httpServer = createServer(app);
@@ -15,6 +16,10 @@ createRealtime(httpServer);
 // `getRedis()` é no-op quando REDIS_ENABLED=false, e nunca lança.
 getRedis();
 
+// Sobe o barramento de eventos (consumidores + relay do outbox). No-op quando o
+// RabbitMQ está desligado; nunca lança no boot.
+void startEvents();
+
 const server = httpServer.listen(env.PORT, () => {
   logger.info(`ZERO API rodando em http://localhost:${env.PORT}`);
   logger.info(`Realtime (WebSocket) em ws://localhost:${env.PORT}${REALTIME_PATH}`);
@@ -23,9 +28,9 @@ const server = httpServer.listen(env.PORT, () => {
 const shutdown = (signal: string) => {
   logger.info(`${signal} recebido, encerrando...`);
   server.close(() => {
-    // Encerra o Redis depois do servidor HTTP: requisições em voo ainda podem
-    // querer ler do cache enquanto drenam.
-    void disconnectRedis().finally(() => process.exit(0));
+    // Encerra dependências depois do servidor HTTP: requisições em voo ainda podem
+    // querer ler do cache ou gravar no outbox enquanto drenam.
+    void Promise.allSettled([stopEvents(), disconnectRedis()]).finally(() => process.exit(0));
   });
   setTimeout(() => process.exit(1), 10_000).unref();
 };

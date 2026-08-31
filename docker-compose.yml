@@ -52,6 +52,23 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Barramento de eventos de domínio. A imagem `-management` sobe também a UI em
+  # :15672 (guest/guest) — as filas, os binds, a DLQ e o profundímetro de cada fila
+  # ficam VISÍVEIS ao vivo, que é metade do valor de defesa na banca. Sem volume, de
+  # propósito: a fonte da verdade dos eventos é o outbox no Postgres, não o broker.
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: zelo-rabbitmq
+    ports:
+      - "${RABBITMQ_PORT:-56672}:5672"
+      - "${RABBITMQ_UI_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   # Compila o bundle web do Expo e o entrega no volume `web-dist`. É um job:
   # roda, copia, termina. A API só sobe depois que ele conclui com sucesso.
   web:
@@ -71,6 +88,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       web:
         condition: service_completed_successfully
@@ -96,6 +115,8 @@ services:
       ML_TIMEOUT_MS: ${ML_TIMEOUT_MS:-2000}
       REDIS_ENABLED: ${REDIS_ENABLED:-true}
       REDIS_URL: redis://redis:6379
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-true}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     ports:
       - "${API_PORT:-4000}:4000"
     volumes:
