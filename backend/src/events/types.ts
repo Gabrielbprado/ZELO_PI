@@ -21,6 +21,8 @@ export const ROUTING_KEYS = {
   PAYMENT_CONFIRMED: 'payment.confirmed',
   MESSAGE_CREATED: 'message.created',
   REVIEW_CREATED: 'review.created',
+  // Lembrete de agendamento, emitido por um job DELAYED (BullMQ) 24h/1h antes do horário.
+  BOOKING_REMINDER: 'booking.reminder',
   // Sincroniza a réplica de push tokens do microserviço de notificações. O backend é
   // dono do token (o cliente o registra aqui); o serviço mantém uma cópia para enviar
   // push, atualizada por este evento — acoplamento por evento, não por FK.
@@ -79,6 +81,14 @@ const reviewCreated = z.object({
   rating: z.number(),
 });
 
+const bookingReminder = z.object({
+  bookingId: z.string(),
+  clientId: z.string(),
+  providerUserId: z.string(),
+  title: z.string(),
+  when: z.enum(['24h', '1h']),
+});
+
 const pushTokenSet = z.object({
   userId: z.string(),
   pushToken: z.string().nullable(),
@@ -93,6 +103,7 @@ export const EVENT_SCHEMAS = {
   [ROUTING_KEYS.PAYMENT_CONFIRMED]: paymentConfirmed,
   [ROUTING_KEYS.MESSAGE_CREATED]: messageCreated,
   [ROUTING_KEYS.REVIEW_CREATED]: reviewCreated,
+  [ROUTING_KEYS.BOOKING_REMINDER]: bookingReminder,
   [ROUTING_KEYS.USER_PUSHTOKEN_SET]: pushTokenSet,
 } as const satisfies Record<RoutingKey, z.ZodTypeAny>;
 

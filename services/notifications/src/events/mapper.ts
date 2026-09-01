@@ -76,6 +76,17 @@ export function toInbox(event: DomainEvent): InboxEntry | null {
         data: { type: 'MESSAGE', senderId: p.senderId, bookingId: p.bookingId ?? null },
       };
     }
+    case ROUTING_KEYS.BOOKING_REMINDER: {
+      const p = event.payload;
+      const quando = p.when === '24h' ? 'amanhã' : 'em 1 hora';
+      return {
+        userId: p.clientId,
+        type: 'BOOKING',
+        title: 'Lembrete de agendamento ⏰',
+        body: `${p.title} está agendado para ${quando}.`,
+        data: { type: 'BOOKING', bookingId: p.bookingId, reminder: p.when },
+      };
+    }
     case ROUTING_KEYS.REVIEW_CREATED: {
       const p = event.payload;
       return {

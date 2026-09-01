@@ -63,6 +63,16 @@ const schema = z.object({
   // Após quantas reentregas um evento vai para a DLQ em vez de voltar para a fila
   // de retry. Conta a partir do header `x-death` que o RabbitMQ mantém.
   EVENT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  // Jobs (BullMQ). Kill-switch por cima do Redis: mesmo com Redis ligado, isto desliga o
+  // agendamento. Efetivamente só rodam quando Redis está disponível (ver config/jobs.ts).
+  JOBS_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+  // Um booking REQUESTED sem resposta por este tempo é expirado por um job.
+  BOOKING_EXPIRY_HOURS: z.coerce.number().int().positive().default(48),
+  // Bull Board (UI das filas) em /admin/queues. Basic auth em vez de Bearer porque a UI
+  // faz polling no navegador — o browser reenvia a credencial Basic a cada request, um
+  // header Bearer não. Defaults só de DEV; sobrescreva em qualquer ambiente exposto.
+  ADMIN_UI_USER: z.string().default('admin'),
+  ADMIN_UI_PASSWORD: z.string().default('zelo-admin'),
 }).superRefine((cfg, ctx) => {
   // Um serviço de ranking aberto sem token receberia userId e coordenadas de
   // qualquer um. Se a integração está ligada e apontada para algum lugar, o

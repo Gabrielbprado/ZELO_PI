@@ -5,6 +5,7 @@ import { logger } from './utils/logger';
 import { createRealtime, REALTIME_PATH } from './realtime/io';
 import { getRedis, disconnectRedis } from './config/redis';
 import { startEvents, stopEvents } from './events';
+import { startJobs, stopJobs } from './jobs';
 
 const app = createApp();
 const httpServer = createServer(app);
@@ -20,6 +21,9 @@ getRedis();
 // RabbitMQ está desligado; nunca lança no boot.
 void startEvents();
 
+// Sobe os workers de jobs (BullMQ) e registra os crons. No-op sem Redis.
+void startJobs();
+
 const server = httpServer.listen(env.PORT, () => {
   logger.info(`ZERO API rodando em http://localhost:${env.PORT}`);
   logger.info(`Realtime (WebSocket) em ws://localhost:${env.PORT}${REALTIME_PATH}`);
@@ -30,7 +34,7 @@ const shutdown = (signal: string) => {
   server.close(() => {
     // Encerra dependências depois do servidor HTTP: requisições em voo ainda podem
     // querer ler do cache ou gravar no outbox enquanto drenam.
-    void Promise.allSettled([stopEvents(), disconnectRedis()]).finally(() => process.exit(0));
+    void Promise.allSettled([stopJobs(), stopEvents(), disconnectRedis()]).finally(() => process.exit(0));
   });
   setTimeout(() => process.exit(1), 10_000).unref();
 };

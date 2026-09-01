@@ -52,6 +52,15 @@ const cases: Array<{ event: DomainEvent; userId: string; type: string }> = [
     userId: 'prov',
     type: 'REVIEW',
   },
+  {
+    event: {
+      id: 'e6',
+      routingKey: ROUTING_KEYS.BOOKING_REMINDER,
+      payload: { bookingId: 'b1', clientId: 'cli', providerUserId: 'prov', title: 'Faxina', when: '24h' },
+    },
+    userId: 'cli', // o lembrete é para o CLIENTE
+    type: 'BOOKING',
+  },
 ];
 
 describe('toInbox', () => {

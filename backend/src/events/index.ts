@@ -3,6 +3,8 @@ import { disconnectAmqp, isAmqpEnabled } from '../config/amqp';
 import { startOutboxRelay, stopOutboxRelay } from './relay';
 import { startConsumer, stopConsumers } from './consumers/runtime';
 import { analyticsConsumer } from './consumers/analytics.consumer';
+import { remindersConsumer } from './consumers/reminders.consumer';
+import { jobsEnabled } from '../config/jobs';
 
 /**
  * Liga o barramento: consumidores primeiro (declaram as filas e já ficam ouvindo),
@@ -22,6 +24,9 @@ export async function startEvents(): Promise<void> {
     return;
   }
   await startConsumer(analyticsConsumer);
+  // O consumidor de lembretes só faz sentido com jobs (BullMQ/Redis) ligados — é ele que
+  // traduz booking.accepted/cancelled em jobs delayed.
+  if (jobsEnabled()) await startConsumer(remindersConsumer);
   startOutboxRelay();
 }
 

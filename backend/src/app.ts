@@ -12,6 +12,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimit';
 import { requestContext } from './middleware/requestContext';
 import { httpMetrics } from './middleware/metrics';
+import { adminBasicAuth } from './middleware/basicAuth';
+import { buildBullBoardRouter } from './jobs/bullBoard';
 
 export function createApp() {
   const app = express();
@@ -59,6 +61,11 @@ export function createApp() {
   // /metrics ANTES do rate limiter: o Prometheus raspa a cada poucos segundos e não pode
   // consumir o orçamento de 200 req/15min destinado a proteger a API.
   app.use('/metrics', metricsRoutes);
+
+  // Bull Board (UI das filas) em /admin/queues, com Basic auth. Antes do rate limiter
+  // porque a UI faz muitos requests de polling/asset. Ausente quando os jobs estão off.
+  const bullBoard = buildBullBoardRouter('/admin/queues');
+  if (bullBoard) app.use('/admin/queues', adminBasicAuth, bullBoard);
 
   app.use(generalLimiter);
   app.use('/api/v1', router);
