@@ -49,6 +49,18 @@ async function main() {
     },
   });
 
+  console.log('Admin exemplo (admin@zelo.dev / Senha@123)...');
+  await prisma.user.create({
+    data: {
+      name: 'Admin ZELO',
+      email: 'admin@zelo.dev',
+      passwordHash,
+      role: Role.ADMIN,
+      emailVerified: true,
+      avatarHue: 20,
+    },
+  });
+
   console.log('Prestadores...');
   for (const p of proSeeds) {
     const user = await prisma.user.create({

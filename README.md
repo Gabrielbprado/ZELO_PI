@@ -154,7 +154,8 @@ docker compose up --build
 Na primeira vez leva alguns minutos (baixa as imagens e compila). Quando aparecer
 `ZERO API rodando`, abra:
 
-**<http://localhost:4000>** — e entre com **`marina@zero.dev`** / **`Senha@123`**.
+**<http://localhost:4000>** — e entre com **`marina@zero.dev`** / **`Senha@123`** (cliente).
+Para ver o **painel administrativo** (GMV, funil), entre como **`admin@zelo.dev`** / **`Senha@123`**.
 
 Para parar: `Ctrl+C`. Para subir em segundo plano: `docker compose up --build -d`; para
 derrubar tudo: `docker compose down` (ou `docker compose down -v` para apagar também o
