@@ -26,7 +26,6 @@ async function main() {
   await prisma.portfolioItem.deleteMany();
   await prisma.budgetEstimate.deleteMany();
   await prisma.refreshToken.deleteMany();
-  await prisma.notification.deleteMany();
   await prisma.providerProfile.deleteMany();
   await prisma.user.deleteMany();
   await prisma.category.deleteMany();

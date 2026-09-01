@@ -123,37 +123,72 @@ inbox vazio), nunca uma queda. Decisões formalizadas em **[docs/adr/](docs/adr/
 
 ---
 
-## Rodar com Docker
+## Rodar com Docker (recomendado)
 
-Um comando sobe tudo: PostgreSQL com PostGIS, API migrada e **já populada com o
-seed**, e o app web servido pela própria API. Só é preciso ter Docker instalado.
+Um único comando sobe **tudo**: PostgreSQL + PostGIS (com os schemas `public` e
+`notifications`), Redis, RabbitMQ, o microserviço de notificações, a API já **migrada e
+populada com o seed**, e o app web servido pela própria API. Só é preciso ter o Docker
+instalado.
+
+### 1. Instale o Docker
+
+- **Windows** → [Docker Desktop](https://www.docker.com/products/docker-desktop/) (inclui o
+  Docker Compose). Abra o Docker Desktop e espere ficar "Running".
+- **Linux** → Docker Engine + plugin Compose:
+  ```bash
+  curl -fsSL https://get.docker.com | sh
+  sudo usermod -aG docker $USER   # e reabra o terminal
+  ```
+
+### 2. Baixe o projeto e suba
+
+O comando é **o mesmo nos dois sistemas**. Abra o terminal (no Windows, PowerShell ou o
+terminal do Docker Desktop) na pasta do projeto:
 
 ```bash
+git clone https://github.com/Gabrielbprado/ZELO_PI.git
+cd ZELO_PI
 docker compose up --build
 ```
 
-Abra **<http://localhost:4000>** e entre com `marina@zero.dev` / `Senha@123`.
+Na primeira vez leva alguns minutos (baixa as imagens e compila). Quando aparecer
+`ZERO API rodando`, abra:
 
-| | |
+**<http://localhost:4000>** — e entre com **`marina@zero.dev`** / **`Senha@123`**.
+
+Para parar: `Ctrl+C`. Para subir em segundo plano: `docker compose up --build -d`; para
+derrubar tudo: `docker compose down` (ou `docker compose down -v` para apagar também o
+banco e recomeçar do zero).
+
+### O que fica disponível
+
+| Serviço | Endereço |
 |---|---|
 | App web + API | <http://localhost:4000> |
-| Health check | <http://localhost:4000/api/v1/health> |
+| Health check | <http://localhost:4000/api/v1/health/ready> |
+| Métricas (Prometheus) | <http://localhost:4000/metrics> |
+| Filas (Bull Board) | <http://localhost:4000/admin/queues> — Basic auth `admin` / `zelo-admin` |
+| RabbitMQ (UI das filas) | <http://localhost:15672> — `guest` / `guest` |
 | PostgreSQL | `localhost:55432` — `postgres` / `postgres` |
 | Redis | `localhost:56379` |
 
-Serviço de recomendação (opcional) e treino do modelo:
+### Extras opcionais
 
 ```bash
-docker compose --profile ml up --build              # sobe o ranker em :8001
-docker compose exec backend npm run prisma:seed:ml -- --verify   # histórico sintético
-docker compose --profile train run --rm ml-train    # treina (ativa só se passar no gate)
+# Recomendação por ML (sobe o ranker em :8001) + treino do modelo
+docker compose --profile ml up --build
+docker compose exec backend npm run prisma:seed:ml -- --verify
+docker compose --profile train run --rm ml-train
+
+# Observabilidade: Prometheus (:9090) + Grafana (:3000, painel já provisionado)
+docker compose --profile obs up
 ```
 
 Comandos do dia a dia, controle do seed (`SEED_ON_START`), testes dentro do
 contêiner e solução de problemas: **[`docs/DOCKER.md`](./docs/DOCKER.md)**.
 
-> As imagens copiam o código na build, sem recarga automática. Para
-> desenvolver, use a instalação nativa abaixo.
+> As imagens copiam o código na build, sem recarga automática. Para desenvolver com
+> hot-reload, use a instalação nativa abaixo.
 
 ---
 

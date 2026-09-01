@@ -5,7 +5,7 @@
   "description": "Microserviço de notificações do ZELO — consome eventos de domínio, persiste o inbox e envia push Expo.",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "lint": "tsc --noEmit",
