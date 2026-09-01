@@ -35,6 +35,7 @@ import KycScreen from '../screens/KycScreen';
 import ReportScreen from '../screens/ReportScreen';
 import WalletScreen from '../screens/WalletScreen';
 import PayoutScreen from '../screens/PayoutScreen';
+import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 
 import type { AuthStackParamList, AppStackParamList, RootTabParamList } from './types';
 
@@ -132,6 +133,7 @@ export function RootNavigator() {
       <AppStack.Screen name="Report" component={ReportScreen} options={{ presentation: 'modal' }} />
       <AppStack.Screen name="Wallet" component={WalletScreen} />
       <AppStack.Screen name="Payout" component={PayoutScreen} />
+      <AppStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
     </AppStack.Navigator>
   );
 }

@@ -37,4 +37,5 @@ export type AppStackParamList = {
   Report: { targetUserId: string; targetName?: string; bookingId?: string };
   Wallet: undefined;
   Payout: { balanceCents: number };
+  AdminDashboard: undefined;
 };

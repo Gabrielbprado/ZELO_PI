@@ -13,6 +13,8 @@ import {
 import { setAvailabilitySchema, slotsSchema, timeOffSchema } from '../validators/availability';
 import * as trust from '../controllers/trust.controller';
 import { documentSchema } from '../validators/trust';
+import { getMyMetrics } from '../services/providerMetrics.service';
+import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
 
@@ -37,6 +39,11 @@ router.delete('/me/time-off/:id', authenticate, requireRole('PROVIDER'), validat
 // Verificação de documentos (KYC) do profissional
 router.post('/me/documents', authenticate, requireRole('PROVIDER'), validate(documentSchema), trust.submitDocument);
 router.get ('/me/documents', authenticate, requireRole('PROVIDER'),                            trust.listMyDocuments);
+
+// Métricas do próprio profissional (dashboard)
+router.get('/me/metrics', authenticate, requireRole('PROVIDER'), asyncHandler(async (req, res) => {
+  res.json(await getMyMetrics(req.user!.sub));
+}));
 
 // Público: horários livres numa data. Antes do /:id para não ser capturado por ele.
 router.get('/:id/slots', validate(slotsSchema), avail.slots);

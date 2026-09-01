@@ -2,7 +2,7 @@ import { View, Text, Pressable, Alert, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { Settings, Bell, ShieldCheck, ChevronRight, LogOut, MessageSquare, UserCog, Briefcase } from 'lucide-react-native';
+import { Settings, Bell, ShieldCheck, ChevronRight, LogOut, MessageSquare, UserCog, Briefcase, LayoutDashboard } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from '../components/Avatar';
@@ -25,6 +25,10 @@ export default function ProfileScreen() {
     { id: 'msg',  label: 'Mensagens',      icon: <MessageSquare size={18} color={theme.colors.text} />, kind: 'tab',   to: 'MessagesTab' },
     ...(user?.role === 'PROVIDER'
       ? [{ id: 'pro', label: 'Gestão profissional', icon: <Briefcase size={18} color={theme.colors.text} />, kind: 'stack' as const, to: 'ProviderManage' as const }]
+      : []
+    ),
+    ...(user?.role === 'ADMIN'
+      ? [{ id: 'admin', label: 'Painel administrativo', icon: <LayoutDashboard size={18} color={theme.colors.text} />, kind: 'stack' as const, to: 'AdminDashboard' as const }]
       : []
     ),
     { id: 'sec',  label: 'Segurança e privacidade', icon: <ShieldCheck size={18} color={theme.colors.text} />, kind: 'stack', to: 'Settings' },
