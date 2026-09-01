@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Alert, ScrollView } from 'react-native';
+import { View, Text, Pressable, Alert, ScrollView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -38,6 +38,21 @@ export default function ProfileScreen() {
   const goTo = (r: Row) => {
     if (r.kind === 'tab')   return tabNav.navigate(r.to);
     if (r.kind === 'stack') return stackNav.navigate(r.to as never);
+  };
+
+  // `Alert.alert` com botões NÃO chama os callbacks no React Native Web (o build que roda
+  // no navegador) — então a confirmação de logout usava o `onPress` que nunca disparava.
+  // Na web usamos `window.confirm`; no nativo, o Alert de sempre.
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if (typeof window !== 'undefined' && window.confirm('Tem certeza que quer sair?')) void logout();
+      return;
+    }
+    Alert.alert('Sair', 'Tem certeza que quer sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: () => { void logout(); } },
+    ]);
   };
 
   return (
@@ -81,10 +96,7 @@ export default function ProfileScreen() {
         </View>
 
         <Pressable
-          onPress={() => Alert.alert('Sair', 'Tem certeza que quer sair?', [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Sair', style: 'destructive', onPress: logout },
-          ])}
+          onPress={confirmLogout}
           style={({ pressed }) => ({
             flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
             paddingVertical: 14, borderRadius: theme.radius.lg,

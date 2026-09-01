@@ -54,9 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    disconnectRealtime();
-    await unregisterFromPush();
-    await authApi.logout();
+    // Cada passo é best-effort: sair SEMPRE tem que resetar o estado local, mesmo que o
+    // desregistro de push ou a chamada ao servidor falhem (ex.: offline, ou no-op na web).
+    try { disconnectRealtime(); } catch { /* ignora */ }
+    try { await unregisterFromPush(); } catch { /* ignora */ }
+    try { await authApi.logout(); } catch { /* ignora — authApi.logout já limpa os tokens */ }
     setUser(null);
   }, []);
 
