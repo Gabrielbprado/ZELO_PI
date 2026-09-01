@@ -3,11 +3,13 @@ import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { getPublishChannel, isAmqpEnabled } from '../config/amqp';
 import { publishConfirmed } from './publisher';
+import { eventsPublished } from '../config/metrics';
 
 interface OutboxRow {
   id: string;
   routingKey: string;
   payload: unknown;
+  requestId: string | null;
 }
 
 let timer: NodeJS.Timeout | null = null;
@@ -31,7 +33,7 @@ async function tick(): Promise<void> {
   await prisma.$transaction(
     async (tx) => {
       const events = await tx.$queryRaw<OutboxRow[]>`
-        SELECT id, "routingKey", payload
+        SELECT id, "routingKey", payload, "requestId"
         FROM "OutboxEvent"
         WHERE "publishedAt" IS NULL
         ORDER BY "createdAt" ASC
@@ -44,8 +46,18 @@ async function tick(): Promise<void> {
       const failed: string[] = [];
       await Promise.all(
         events.map(async (e) => {
-          const ok = await publishConfirmed(channel, { id: e.id, routingKey: e.routingKey, payload: e.payload });
-          (ok ? confirmed : failed).push(e.id);
+          const ok = await publishConfirmed(channel, {
+            id: e.id,
+            routingKey: e.routingKey,
+            payload: e.payload,
+            requestId: e.requestId,
+          });
+          if (ok) {
+            confirmed.push(e.id);
+            eventsPublished.inc({ routing_key: e.routingKey });
+          } else {
+            failed.push(e.id);
+          }
         }),
       );
 

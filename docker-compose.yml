@@ -195,6 +195,39 @@ services:
       - ./ml/reports:/app/reports
     command: ["python", "-m", "zelo_ml.training.train", "--backend", "db", "--activate"]
 
+  # Observabilidade — só sob o profile `obs`, para não pesar o `docker compose up`
+  # padrão (Prometheus + Grafana somam RAM que a demo comum não precisa).
+  #   docker compose --profile obs up
+  #   Grafana em http://localhost:3000 (anônimo, já com o painel provisionado)
+  #   Prometheus em http://localhost:9090
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zelo-prometheus
+    profiles: ["obs"]
+    volumes:
+      - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zelo-grafana
+    profiles: ["obs"]
+    depends_on:
+      - prometheus
+    environment:
+      # Acesso anônimo como Admin: é uma stack de demonstração local, sem segredo.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./docker/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    restart: unless-stopped
+
 volumes:
   db-data:
   web-dist:

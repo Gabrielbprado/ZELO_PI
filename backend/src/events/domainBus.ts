@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { getRequestId } from '../utils/requestContext';
 import type { EventPayload, RoutingKey } from './types';
 
 /**
@@ -25,6 +26,9 @@ export async function recordEvent<K extends RoutingKey>(
     data: {
       routingKey,
       payload: payload as unknown as Prisma.InputJsonValue,
+      // Captura o correlation id da request atual (se houver): é o que liga esta
+      // gravação ao rastro que segue até o consumidor.
+      requestId: getRequestId() ?? null,
     },
   });
 }

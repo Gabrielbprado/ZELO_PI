@@ -1,0 +1,23 @@
+# Prometheus do ZELO — raspa os três serviços que expõem /metrics.
+# Sobe só sob o profile `obs` (docker compose --profile obs up).
+global:
+  scrape_interval: 10s
+  scrape_timeout: 5s
+
+scrape_configs:
+  - job_name: backend
+    static_configs:
+      - targets: ['backend:4000']
+        labels: { app: zelo }
+
+  - job_name: notifications
+    static_configs:
+      - targets: ['notifications:4100']
+        labels: { app: zelo }
+
+  # O ML só está de pé sob o profile `ml`; sem ele, este alvo aparece como "down" no
+  # Prometheus — o que é a informação correta, não um erro.
+  - job_name: ml
+    static_configs:
+      - targets: ['ml:8001']
+        labels: { app: zelo }

@@ -74,42 +74,52 @@ TypeScript, app React Native e serviço de recomendação em Python.
 
 ## Arquitetura
 
+Plataforma distribuída: API + gateway, um **microserviço** de notificações extraído
+(schema-per-service), **RabbitMQ** como barramento de eventos com **outbox transacional**,
+**Redis** para cache/rate limit/breaker, o serviço de **ML**, e observabilidade
+(Prometheus + Grafana). Diagramas Mermaid (contexto C4, sequência de `payment.confirmed`,
+topologia AMQP) e o detalhamento em **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                        Mobile — Expo / RN                          │
-│  AuthContext · ThemeContext · Stack + Tabs · 30 telas              │
-│  Axios com refresh-token · socket.io-client · expo-notifications   │
-└───────────────┬──────────────────────────────┬─────────────────────┘
-                │ HTTPS (Bearer JWT)           │ WebSocket (/realtime)
-┌───────────────▼──────────────────────────────▼─────────────────────┐
-│                     Backend — Node.js / Express                    │
-│  routes → controllers → services → Prisma → PostgreSQL + PostGIS   │
-│  helmet · cors · hpp · rate-limit · zod · auth · socket.io         │
-└──────┬────────────────────────────────────────┬────────────────────┘
-       │ cache · rate limit · circuit breaker   │
-┌──────▼───────────────────┐                    │
-│  Redis  (OPCIONAL)       │                    │
-│  fora do ar ⇒ a API      │                    │
-│  serve direto do banco   │                    │
-└──────────────────────────┘                    │
-                                                │
-                │ POST /v1/rank  (só ids e números — sem dado pessoal)
-┌───────────────▼────────────────────────────────────────────────────┐
-│                 Serviço de ML — Python / FastAPI                   │
-│  features → SVD (colaborativo) → ranker · artefato versionado      │
-│  fora do ar ou lento ⇒ backend degrada para ordenação por nota     │
-└────────────────────────────────────────────────────────────────────┘
+        📱 Mobile (Expo/RN)
+          │ HTTPS (JWT) · WebSocket
+┌─────────▼───────────────────────────────────────────────┐
+│  Backend — Node/Express                                  │
+│  API · gateway · WebSocket · domínio · outbox · relay    │
+└──┬────────┬──────────────┬───────────────┬───────────────┘
+   │ cache  │ AMQP publish  │ HTTP /rank    │ HTTP /internal
+┌──▼───┐  ┌─▼──────────┐    │            ┌──▼───────────────┐
+│Redis │  │ RabbitMQ   │    │            │ Notificações     │
+│(opc.)│  │ zelo.events│──notifications.q─▶ (Node · inbox ·  │
+└──────┘  └─┬──────────┘    │            │  push · schema   │
+            │ analytics.q   │            │  notifications)  │
+        ┌───▼──────────┐ ┌──▼─────────┐  └──────┬───────────┘
+        │ consumidor   │ │ ML         │         │
+        │ analytics    │ │ (FastAPI)  │         │
+        └──────────────┘ └────────────┘         │
+   ┌──────────────────────────────────────────────────────┐
+   │  PostgreSQL + PostGIS                                 │
+   │  schema public (backend)  ·  schema notifications     │
+   └──────────────────────────────────────────────────────┘
+   observabilidade: Prometheus + Grafana (profile obs)
 ```
+
+Tudo o que é infra é **degradável**: Redis, RabbitMQ, ML e o serviço de notificações fora
+do ar viram degradações nomeadas (cache passthrough, outbox represado, ranking por nota,
+inbox vazio), nunca uma queda. Decisões formalizadas em **[docs/adr/](docs/adr/README.md)**.
 
 | Camada | Tecnologias |
 |---|---|
 | Mobile | React Native 0.81, Expo 54, React Navigation v7, Axios, socket.io-client, Lucide, `expo-secure-store`, `expo-notifications` |
 | Backend | Node.js 20+, Express 4, TypeScript 5, Prisma 5, Zod, Pino, Socket.IO 4 |
+| Notificações | Node 20, Express, Prisma (schema `notifications`), amqplib — consome eventos, persiste o inbox, envia push |
 | ML | Python 3.12, FastAPI, scikit-learn, NumPy, SciPy (sem pandas em produção) |
-| Banco | PostgreSQL 14+ **com PostGIS** |
-| Cache | Redis 7 — **opcional**: cache de leitura, rate limit entre instâncias e estado compartilhado do circuit breaker |
-| Segurança | bcryptjs, JWT (access + refresh rotativo), Helmet, allow-list de CORS, `express-rate-limit`, `hpp` |
-| Testes | Jest + Supertest (unit + integração), pytest (ML) |
+| Banco | PostgreSQL 16 **com PostGIS** — schemas `public` e `notifications` |
+| Cache | Redis 7 — **opcional**: cache de leitura, rate limit entre instâncias e estado do circuit breaker |
+| Mensageria | RabbitMQ 3 — **opcional**: barramento `zelo.events` (topic), outbox transacional, DLQ + retry |
+| Observabilidade | `prom-client` (Node) + `prometheus-fastapi-instrumentator` (Python), Prometheus + Grafana (profile `obs`), correlation id ponta a ponta |
+| Segurança | bcryptjs, JWT (access + refresh rotativo), Helmet, allow-list de CORS, `express-rate-limit`, `hpp`, tokens de serviço (`X-ML-Token`, `X-SERVICE-TOKEN`) |
+| Testes | Jest + Supertest (backend + serviço, unit + integração com broker real), pytest (ML) |
 
 ---
 

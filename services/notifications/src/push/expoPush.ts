@@ -1,6 +1,7 @@
 import { env } from '../config/env';
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
+import { pushSent } from '../config/metrics';
 
 /**
  * Envio de push Expo — movido do backend para cá. A diferença de arquitetura: o token
@@ -27,6 +28,7 @@ export async function pushToUser(userId: string, payload: PushPayload): Promise<
     const token = row?.token;
     if (!token || !EXPO_PUSH_TOKEN_RE.test(token)) return;
 
+    pushSent.inc();
     await sendExpoPush(token, payload);
   } catch (err) {
     logger.warn({ err, userId }, 'push falhou');

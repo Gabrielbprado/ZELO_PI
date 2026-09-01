@@ -4,6 +4,8 @@ import { prisma } from '../config/prisma';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { createChannel } from '../config/amqp';
+import { runWithRequestContext } from '../config/requestContext';
+import { eventsConsumed, eventProcessing, notificationsPersisted } from '../config/metrics';
 import { assertTopology } from './topology';
 import { toInbox } from './mapper';
 import { pushToUser } from '../push/expoPush';
@@ -48,6 +50,7 @@ async function persistAndPush(event: DomainEvent): Promise<void> {
       data: entry.data as unknown as Prisma.InputJsonValue,
     },
   });
+  notificationsPersisted.inc();
 
   await pushToUser(entry.userId, { title: entry.title, body: entry.body, data: entry.data });
 }
@@ -97,20 +100,37 @@ async function processMessage(ch: Channel, msg: ConsumeMessage): Promise<void> {
   }
 
   const event = { id: eventId, routingKey, payload: parsed.data } as DomainEvent;
+  const header = msg.properties.headers?.['x-request-id'];
+  const requestId = typeof header === 'string' ? header : undefined;
 
-  try {
-    if (routingKey === ROUTING_KEYS.USER_PUSHTOKEN_SET) {
-      await handlePushToken(event);
-    } else {
-      await persistAndPush(event);
+  const run = async (): Promise<void> => {
+    const endTimer = eventProcessing.startTimer();
+    try {
+      if (routingKey === ROUTING_KEYS.USER_PUSHTOKEN_SET) {
+        await handlePushToken(event);
+      } else {
+        await persistAndPush(event);
+      }
+      ch.ack(msg);
+      eventsConsumed.inc({ result: 'ok' });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        ch.ack(msg); // duplicata: já persistida numa entrega anterior
+        eventsConsumed.inc({ result: 'duplicate' });
+        return;
+      }
+      scheduleRetry(ch, msg, err);
+      eventsConsumed.inc({ result: 'retry' });
+    } finally {
+      endTimer();
     }
-    ch.ack(msg);
-  } catch (err) {
-    if (isUniqueViolation(err)) {
-      ch.ack(msg); // duplicata: já persistida numa entrega anterior
-      return;
-    }
-    scheduleRetry(ch, msg, err);
+  };
+
+  // Reidrata o correlation id (do backend, via header AMQP) para os logs deste serviço.
+  if (requestId) {
+    await runWithRequestContext({ requestId }, run);
+  } else {
+    await run();
   }
 }
 

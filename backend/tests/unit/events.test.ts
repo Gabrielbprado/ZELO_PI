@@ -8,6 +8,7 @@
  * consumidor; a cobertura dele agora vive em services/notifications/tests.)
  */
 import { recordEvent } from '../../src/events/domainBus';
+import { runWithRequestContext } from '../../src/utils/requestContext';
 import { ROUTING_KEYS, retryLevelFor, EVENT_SCHEMAS } from '../../src/events/types';
 
 describe('recordEvent', () => {
@@ -30,6 +31,8 @@ describe('recordEvent', () => {
       data: {
         routingKey: 'booking.created',
         payload: expect.objectContaining({ bookingId: 'b1', providerUserId: 'prov' }),
+        // Fora de uma request HTTP não há correlation id.
+        requestId: null,
       },
     });
   });
@@ -49,6 +52,24 @@ describe('recordEvent', () => {
     expect(EVENT_SCHEMAS[ROUTING_KEYS.PAYMENT_CONFIRMED].safeParse(saved).success).toBe(true);
   });
 
+  it('captura o requestId do contexto da request (correlation id → outbox)', async () => {
+    const create = jest.fn().mockResolvedValue({});
+    const tx = { outboxEvent: { create } } as never;
+
+    await runWithRequestContext({ requestId: 'req-xyz' }, () =>
+      recordEvent(tx, ROUTING_KEYS.BOOKING_ACCEPTED, {
+        bookingId: 'b',
+        clientId: 'c',
+        providerUserId: 'p',
+        title: 't',
+      }),
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ requestId: 'req-xyz' }) }),
+    );
+  });
+
   it('grava user.pushtoken.set com o token (ou null)', async () => {
     const create = jest.fn().mockResolvedValue({});
     const tx = { outboxEvent: { create } } as never;
@@ -56,7 +77,11 @@ describe('recordEvent', () => {
     await recordEvent(tx, ROUTING_KEYS.USER_PUSHTOKEN_SET, { userId: 'u1', pushToken: null });
 
     expect(create).toHaveBeenCalledWith({
-      data: { routingKey: 'user.pushtoken.set', payload: expect.objectContaining({ userId: 'u1', pushToken: null }) },
+      data: {
+        routingKey: 'user.pushtoken.set',
+        payload: expect.objectContaining({ userId: 'u1', pushToken: null }),
+        requestId: null,
+      },
     });
   });
 });

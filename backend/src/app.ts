@@ -7,8 +7,11 @@ import pinoHttp from 'pino-http';
 import { corsOrigins, env, isProd } from './config/env';
 import { logger } from './utils/logger';
 import { router } from './routes';
+import metricsRoutes from './routes/metrics.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimit';
+import { requestContext } from './middleware/requestContext';
+import { httpMetrics } from './middleware/metrics';
 
 export function createApp() {
   const app = express();
@@ -35,6 +38,11 @@ export function createApp() {
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
   app.use(hpp());
 
+  // Contexto da request (correlation id) antes de qualquer log, para que toda linha —
+  // inclusive as do pino-http — carregue o requestId. Métrica de HTTP logo em seguida.
+  app.use(requestContext);
+  app.use(httpMetrics);
+
   if (process.env.NODE_ENV !== 'test') {
     app.use(pinoHttp({
       logger,
@@ -47,6 +55,10 @@ export function createApp() {
   // para proteger a API — não o servidor de arquivos.
   const webDist = env.WEB_DIST_DIR ? path.resolve(env.WEB_DIST_DIR) : null;
   if (webDist) app.use(express.static(webDist));
+
+  // /metrics ANTES do rate limiter: o Prometheus raspa a cada poucos segundos e não pode
+  // consumir o orçamento de 200 req/15min destinado a proteger a API.
+  app.use('/metrics', metricsRoutes);
 
   app.use(generalLimiter);
   app.use('/api/v1', router);

@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type RequestHandler, type Res
 import { env } from '../config/env';
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
+import { register } from '../config/metrics';
 
 const NOTIFICATIONS_LIMIT = 100;
 
@@ -41,6 +42,12 @@ export function createServer() {
 
   // Liveness — sem token, sem dependência. É o que o healthcheck do contêiner consulta.
   app.get('/internal/health', (_req, res) => res.json({ status: 'ok', service: 'notifications' }));
+
+  // /metrics também sem token: o Prometheus raspa, e não há segredo aqui.
+  app.get('/metrics', async (_req, res) => {
+    res.set('Content-Type', register.contentType);
+    res.send(await register.metrics());
+  });
 
   app.use(requireServiceToken);
 

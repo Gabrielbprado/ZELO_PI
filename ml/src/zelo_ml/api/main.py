@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from prometheus_client import CONTENT_TYPE_LATEST, Histogram, generate_latest
 
 from ..logging import configure_logging
 from ..settings import settings
@@ -15,6 +17,14 @@ from .deps import registry
 from .routes import health, model, rank
 
 logger = logging.getLogger(__name__)
+
+# Definido no nível do módulo (não por create_app) para não registrar a mesma série duas
+# vezes quando os testes criam vários apps. O rótulo `path` usa a ROTA casada, não a URL.
+_http_duration = Histogram(
+    "http_request_duration_seconds",
+    "Duração das requisições HTTP",
+    ["method", "path", "status"],
+)
 
 
 async def _poll_artifact() -> None:
@@ -59,6 +69,24 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(rank.router)
     app.include_router(model.router)
+
+    @app.middleware("http")
+    async def _metrics_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+        started = time.perf_counter()
+        response = await call_next(request)
+        route = request.scope.get("route")
+        path = getattr(route, "path", "unknown")
+        _http_duration.labels(request.method, path, str(response.status_code)).observe(
+            time.perf_counter() - started
+        )
+        return response
+
+    # /metrics para o Prometheus — o terceiro serviço no painel do Grafana, ao lado do
+    # backend e do de notificações.
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
     return app
 
 

@@ -343,6 +343,10 @@ model OutboxEvent {
   attempts    Int       @default(0)
   createdAt   DateTime  @default(now())
   publishedAt DateTime?
+  // Correlation id da request HTTP que originou o evento. Viaja como header AMQP até o
+  // consumidor, que o reidrata — é o que fecha o rastro ponta a ponta atravessando o
+  // gap assíncrono do relay.
+  requestId   String?
 }
 
 /// Deduplicação de consumo. Cada consumidor registra aqui os eventos que já tratou;

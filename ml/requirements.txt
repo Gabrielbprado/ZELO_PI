@@ -13,3 +13,7 @@ scipy~=1.14
 scikit-learn~=1.5
 joblib~=1.4
 psycopg[binary]~=3.2
+# Observabilidade: /metrics para o Prometheus. Usamos o prometheus-client direto (um
+# middleware curto + o endpoint), e não o instrumentator, que tem um bug de introspecção
+# de rotas com esta versão do FastAPI. Leve — não puxa pandas, a guarda de memória segue.
+prometheus-client~=0.21

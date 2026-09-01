@@ -3,6 +3,8 @@ import type { Channel, ConsumeMessage } from 'amqplib';
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
+import { runWithRequestContext } from '../../utils/requestContext';
+import { eventsConsumed, eventProcessing } from '../../config/metrics';
 import { createConsumerChannel } from '../../config/amqp';
 import { assertBaseTopology, assertConsumerTopology } from '../topology';
 import {
@@ -77,19 +79,38 @@ async function processMessage(channel: Channel, consumer: EventConsumer, msg: Co
 
   const event = { id: eventId, routingKey, payload: parsed.data } as DomainEvent;
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      await consumer.handle(event, tx);
-      await tx.processedEvent.create({ data: { consumer: consumer.name, eventId } });
-    });
-    channel.ack(msg);
-  } catch (err) {
-    if (isUniqueViolation(err)) {
-      // Já processado por uma entrega anterior. Rollback já desfez os efeitos desta.
+  // Reidrata o correlation id que veio do backend no header: os logs deste consumidor
+  // passam a carregar o mesmo requestId da request HTTP que originou o evento.
+  const header = msg.properties.headers?.['x-request-id'];
+  const requestId = typeof header === 'string' ? header : undefined;
+
+  const handle = async (): Promise<void> => {
+    const endTimer = eventProcessing.startTimer({ consumer: consumer.name });
+    try {
+      await prisma.$transaction(async (tx) => {
+        await consumer.handle(event, tx);
+        await tx.processedEvent.create({ data: { consumer: consumer.name, eventId } });
+      });
       channel.ack(msg);
-      return;
+      eventsConsumed.inc({ consumer: consumer.name, result: 'ok' });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        // Já processado por uma entrega anterior. Rollback já desfez os efeitos desta.
+        channel.ack(msg);
+        eventsConsumed.inc({ consumer: consumer.name, result: 'duplicate' });
+        return;
+      }
+      scheduleRetry(channel, consumer, msg, err);
+      eventsConsumed.inc({ consumer: consumer.name, result: 'retry' });
+    } finally {
+      endTimer();
     }
-    scheduleRetry(channel, consumer, msg, err);
+  };
+
+  if (requestId) {
+    await runWithRequestContext({ requestId }, handle);
+  } else {
+    await handle();
   }
 }
 

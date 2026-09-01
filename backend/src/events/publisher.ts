@@ -6,6 +6,7 @@ export interface PublishableEvent {
   id: string;
   routingKey: string;
   payload: unknown;
+  requestId?: string | null;
 }
 
 /**
@@ -32,7 +33,9 @@ export function publishConfirmed(channel: ConfirmChannel, event: PublishableEven
           // no consumidor. Same event id → processado uma vez, sempre.
           messageId: event.id,
           timestamp: Math.floor(Date.now() / 1000),
-          headers: { [HEADER_ATTEMPTS]: 0 },
+          // O correlation id viaja no header: o consumidor o reidrata e o rastro
+          // continua do outro lado do broker.
+          headers: { [HEADER_ATTEMPTS]: 0, ...(event.requestId ? { 'x-request-id': event.requestId } : {}) },
         },
         (err) => resolve(!err),
       );
