@@ -35,4 +35,6 @@ export type AppStackParamList = {
   Availability: undefined;
   Kyc: undefined;
   Report: { targetUserId: string; targetName?: string; bookingId?: string };
+  Wallet: undefined;
+  Payout: { balanceCents: number };
 };

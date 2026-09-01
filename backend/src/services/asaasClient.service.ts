@@ -21,6 +21,8 @@ const pixQrSchema = z.object({
   expirationDate: z.string().optional().nullable(),
 });
 
+const transferSchema = z.object({ id: z.string(), status: z.string() });
+
 export interface AsaasPayment {
   id: string;
   status: string;
@@ -109,4 +111,14 @@ export async function getPixQrCode(paymentId: string): Promise<AsaasPixQr | null
   const res = await asaasFetch(`/payments/${encodeURIComponent(paymentId)}/pixQrCode`, { method: 'GET' });
   const data = await parse(res, pixQrSchema, 'getPixQrCode');
   return data ? { encodedImage: data.encodedImage, payload: data.payload, expirationDate: data.expirationDate ?? null } : null;
+}
+
+/** Transferência PIX (saque): manda o valor da conta Asaas da plataforma para uma chave PIX. */
+export async function createTransfer(input: { value: number; pixKey: string; description?: string }): Promise<{ id: string; status: string } | null> {
+  const res = await asaasFetch('/transfers', {
+    method: 'POST',
+    body: JSON.stringify({ value: input.value, pixAddressKey: input.pixKey, operationType: 'PIX', description: input.description }),
+  });
+  const data = await parse(res, transferSchema, 'createTransfer');
+  return data ? { id: data.id, status: data.status } : null;
 }

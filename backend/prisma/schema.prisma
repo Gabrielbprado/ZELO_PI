@@ -346,10 +346,87 @@ model Payment {
   method    String        @default("pix")
   status    PaymentStatus @default(PENDING)
   externalId String?
+  // Preenchidos na liquidação do escrow (em CENTAVOS): a comissão da plataforma e o
+  // líquido do profissional. `amount` segue em reais inteiros (não migro dinheiro
+  // destrutivamente); a carteira e o ledger trabalham em centavos.
+  platformFeeCents Int?
+  netAmountCents   Int?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+enum LedgerType {
+  CREDIT
+  DEBIT
+}
+
+enum LedgerCategory {
+  ESCROW_HOLD
+  PLATFORM_FEE
+  PAYOUT
+  REFUND
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PROCESSING
+  PAID
+  FAILED
+}
+
+/// Carteira do profissional, em CENTAVOS. `pendingCents` é o dinheiro em escrow (pago pelo
+/// cliente, aguardando a conclusão do serviço); `balanceCents` é o disponível para saque.
+/// Invariante: balanceCents + pendingCents == SUM(ledger CREDIT) − SUM(ledger DEBIT).
+model Wallet {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  balanceCents Int      @default(0)
+  pendingCents Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entries LedgerEntry[]
+  payouts Payout[]
+}
+
+/// Lançamento imutável do ledger. Fonte da verdade do TOTAL (balance+pending) da carteira.
+/// A movimentação pending→balance na liquidação é operação de estado da carteira (não
+/// muda o total), então não vira lançamento; só os fatos que mudam o total entram aqui.
+model LedgerEntry {
+  id          String         @id @default(uuid())
+  walletId    String
+  type        LedgerType
+  category    LedgerCategory
+  amountCents Int
+  description String?
+  bookingId   String?
+  paymentId   String?
+  createdAt   DateTime       @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+  @@index([paymentId])
+}
+
+/// Solicitação de saque via PIX. Debita o saldo na criação (reserva os fundos) e é
+/// processada pelo Asaas (Transfer) quando ligado, ou marcada como paga no modo mock.
+model Payout {
+  id            String       @id @default(uuid())
+  walletId      String
+  amountCents   Int
+  status        PayoutStatus @default(REQUESTED)
+  pixKey        String
+  externalId    String?
+  failureReason String?
+  processedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
 }
 
 model RefreshToken {

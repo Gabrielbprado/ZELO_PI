@@ -82,6 +82,8 @@ const schema = z.object({
   // Token que o Asaas envia no header `asaas-access-token` do webhook; valida a origem.
   ASAAS_WEBHOOK_TOKEN: z.string().optional(),
   ASAAS_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
+  // Comissão da plataforma (%) retida na liquidação do escrow.
+  PLATFORM_FEE_PERCENT: z.coerce.number().min(0).max(50).default(12),
 }).superRefine((cfg, ctx) => {
   // Um serviço de ranking aberto sem token receberia userId e coordenadas de
   // qualquer um. Se a integração está ligada e apontada para algum lugar, o

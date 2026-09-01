@@ -4,6 +4,7 @@ import { startOutboxRelay, stopOutboxRelay } from './relay';
 import { startConsumer, stopConsumers } from './consumers/runtime';
 import { analyticsConsumer } from './consumers/analytics.consumer';
 import { remindersConsumer } from './consumers/reminders.consumer';
+import { ledgerConsumer } from './consumers/ledger.consumer';
 import { jobsEnabled } from '../config/jobs';
 
 /**
@@ -24,6 +25,8 @@ export async function startEvents(): Promise<void> {
     return;
   }
   await startConsumer(analyticsConsumer);
+  // Consumidor do ledger: escrow + comissão. Move dinheiro a partir dos eventos.
+  await startConsumer(ledgerConsumer);
   // O consumidor de lembretes só faz sentido com jobs (BullMQ/Redis) ligados — é ele que
   // traduz booking.accepted/cancelled em jobs delayed.
   if (jobsEnabled()) await startConsumer(remindersConsumer);
