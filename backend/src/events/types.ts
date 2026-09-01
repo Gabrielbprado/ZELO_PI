@@ -21,6 +21,10 @@ export const ROUTING_KEYS = {
   PAYMENT_CONFIRMED: 'payment.confirmed',
   MESSAGE_CREATED: 'message.created',
   REVIEW_CREATED: 'review.created',
+  // Sincroniza a réplica de push tokens do microserviço de notificações. O backend é
+  // dono do token (o cliente o registra aqui); o serviço mantém uma cópia para enviar
+  // push, atualizada por este evento — acoplamento por evento, não por FK.
+  USER_PUSHTOKEN_SET: 'user.pushtoken.set',
 } as const;
 
 export type RoutingKey = (typeof ROUTING_KEYS)[keyof typeof ROUTING_KEYS];
@@ -75,6 +79,11 @@ const reviewCreated = z.object({
   rating: z.number(),
 });
 
+const pushTokenSet = z.object({
+  userId: z.string(),
+  pushToken: z.string().nullable(),
+});
+
 /** Registro chave→schema. É a fonte da verdade para validar e para tipar payloads. */
 export const EVENT_SCHEMAS = {
   [ROUTING_KEYS.BOOKING_CREATED]: bookingCreated,
@@ -84,6 +93,7 @@ export const EVENT_SCHEMAS = {
   [ROUTING_KEYS.PAYMENT_CONFIRMED]: paymentConfirmed,
   [ROUTING_KEYS.MESSAGE_CREATED]: messageCreated,
   [ROUTING_KEYS.REVIEW_CREATED]: reviewCreated,
+  [ROUTING_KEYS.USER_PUSHTOKEN_SET]: pushTokenSet,
 } as const satisfies Record<RoutingKey, z.ZodTypeAny>;
 
 export type EventPayload<K extends RoutingKey> = z.infer<(typeof EVENT_SCHEMAS)[K]>;

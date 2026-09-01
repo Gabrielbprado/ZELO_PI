@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { prisma } from '../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
-import { pushToUser } from './notifications.service';
 import { recordEvent } from '../events/domainBus';
 import { ROUTING_KEYS } from '../events/types';
 
@@ -88,18 +87,9 @@ export async function confirmPayment(userId: string, bookingId: string) {
     return u;
   });
 
-  // Notify the provider that they got paid.
-  await pushToUser(payment.booking.provider.userId, {
-    title: 'Pagamento confirmado 💰',
-    body: `Você recebeu o pagamento de ${formatBRL(updated.amount)}.`,
-    data: { type: 'PAYMENT', bookingId, paymentId: updated.id },
-  });
-
+  // A notificação ao profissional sai do evento payment.confirmed, tratado pelo
+  // microserviço de notificações — sem await de push no caminho da request.
   return updated;
-}
-
-function formatBRL(amount: number): string {
-  return `R$ ${amount.toLocaleString('pt-BR')}`;
 }
 
 export async function getPaymentByBooking(userId: string, bookingId: string) {

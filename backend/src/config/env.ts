@@ -18,13 +18,16 @@ const schema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(200),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
-  // Push notifications (Expo). Kill-switch defaults ON; set to 'false' to
-  // silence push in dev without removing the wiring. `z.coerce.boolean` is
-  // intentionally avoided — it would treat the string 'false' as truthy.
-  PUSH_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
-  EXPO_PUSH_API_URL: z.string().url().default('https://exp.host/--/api/v2/push/send'),
-  EXPO_ACCESS_TOKEN: z.string().optional(),
-  // Serviço de recomendação (ml/). Mesma convenção booleana do PUSH_ENABLED.
+  // Microserviço de notificações (services/notifications). O backend é apenas o
+  // gateway: lê o inbox por HTTP e delega a persistência/push ao serviço. Opcional e
+  // desligado por padrão, exatamente como o ML — sem ele, GET /notifications devolve
+  // lista vazia em vez de 500, e o app segue funcionando. O push (que antes saía
+  // inline daqui) mudou-se por inteiro para o serviço.
+  NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  NOTIFICATIONS_SERVICE_URL: z.string().url().optional(),
+  NOTIFICATIONS_SERVICE_TOKEN: z.string().min(16).optional(),
+  NOTIFICATIONS_TIMEOUT_MS: z.coerce.number().int().positive().default(1500),
+  // Serviço de recomendação (ml/). Mesma convenção booleana do ML_ENABLED.
   ML_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
   ML_SERVICE_URL: z.string().url().optional(),
   ML_SERVICE_TOKEN: z.string().min(16).optional(),
@@ -35,7 +38,7 @@ const schema = z.object({
   ML_CANDIDATE_LIMIT: z.coerce.number().int().positive().max(200).default(150),
   ML_CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(3),
   ML_CIRCUIT_COOLDOWN_MS: z.coerce.number().int().positive().default(30_000),
-  // Redis. Mesma convenção booleana do PUSH_ENABLED, e desligado por padrão de
+  // Redis. Mesma convenção booleana, e desligado por padrão de
   // propósito: `npm run dev` e a suíte de testes precisam continuar subindo em
   // uma máquina sem Redis nenhum. Ligá-lo é opt-in.
   REDIS_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
@@ -69,6 +72,16 @@ const schema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['ML_SERVICE_TOKEN'],
       message: 'ML_SERVICE_TOKEN é obrigatório quando ML_SERVICE_URL está definida',
+    });
+  }
+
+  // Mesma razão do ML: uma API interna sem token aceitaria consultas de inbox de
+  // qualquer origem. Se o gateway está ligado e apontado, o token é obrigatório.
+  if (cfg.NOTIFICATIONS_ENABLED && cfg.NOTIFICATIONS_SERVICE_URL && !cfg.NOTIFICATIONS_SERVICE_TOKEN) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['NOTIFICATIONS_SERVICE_TOKEN'],
+      message: 'NOTIFICATIONS_SERVICE_TOKEN é obrigatório quando NOTIFICATIONS_SERVICE_URL está definida',
     });
   }
 

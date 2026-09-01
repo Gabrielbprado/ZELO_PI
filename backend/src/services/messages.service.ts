@@ -1,7 +1,6 @@
 import { prisma } from '../config/prisma';
 import { ForbiddenError, NotFoundError } from '../errors';
 import { realtimeBus } from '../realtime/bus';
-import { pushToUser } from './notifications.service';
 import { recordEvent } from '../events/domainBus';
 import { ROUTING_KEYS } from '../events/types';
 
@@ -55,15 +54,9 @@ export async function sendMessage(senderId: string, input: SendMessageInput) {
   });
 
   // Push to any connected sockets in real time. No-op without the realtime layer.
+  // (O realtime é in-process e imediato; nada a ver com o push OS-level, que agora sai
+  // do evento message.created no microserviço de notificações.)
   realtimeBus.emitMessageCreated(message);
-
-  // OS-level push for the offline/foreground case. Segue inline nesta onda: o inbox
-  // persistido vem do evento, o push imediato continua daqui (comportamento idêntico).
-  await pushToUser(input.receiverId, {
-    title: sender ? `Nova mensagem de ${sender.name}` : 'Nova mensagem',
-    body: preview,
-    data: { type: 'MESSAGE', senderId, bookingId: input.bookingId ?? null },
-  });
 
   return message;
 }

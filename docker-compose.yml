@@ -69,6 +69,28 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Microserviço de notificações. Consome `notifications.q`, persiste o inbox no schema
+  # `notifications` (mesmo Postgres, schema isolado) e envia o push Expo. O backend só o
+  # consulta por HTTP, autenticado por X-SERVICE-TOKEN. Se cair, GET /notifications no
+  # backend degrada para lista vazia — não derruba o app.
+  notifications:
+    build:
+      context: ./services/notifications
+    container_name: zelo-notifications
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4100
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-zero_marketplace}?schema=notifications
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      SERVICE_TOKEN: ${NOTIFICATIONS_SERVICE_TOKEN:-dev_only_notifications_token_troque_isto}
+      PUSH_ENABLED: ${PUSH_ENABLED:-true}
+    restart: unless-stopped
+
   # Compila o bundle web do Expo e o entrega no volume `web-dist`. É um job:
   # roda, copia, termina. A API só sobe depois que ele conclui com sucesso.
   web:
@@ -91,6 +113,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      notifications:
+        condition: service_started
       web:
         condition: service_completed_successfully
     environment:
@@ -117,6 +141,9 @@ services:
       REDIS_URL: redis://redis:6379
       RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-true}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      NOTIFICATIONS_ENABLED: ${NOTIFICATIONS_ENABLED:-true}
+      NOTIFICATIONS_SERVICE_URL: http://notifications:4100
+      NOTIFICATIONS_SERVICE_TOKEN: ${NOTIFICATIONS_SERVICE_TOKEN:-dev_only_notifications_token_troque_isto}
     ports:
       - "${API_PORT:-4000}:4000"
     volumes:

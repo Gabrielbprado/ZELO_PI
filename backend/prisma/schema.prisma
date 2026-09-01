@@ -46,14 +46,6 @@ enum PaymentStatus {
   FAILED
 }
 
-enum NotificationType {
-  BOOKING
-  MESSAGE
-  REVIEW
-  PROMO
-  SYSTEM
-}
-
 enum RecEventType {
   IMPRESSION
   CLICK
@@ -87,7 +79,6 @@ model User {
   reviewsReceived  Review[]         @relation("Target")
   messagesSent     Message[]        @relation("Sender")
   messagesReceived Message[]        @relation("Receiver")
-  notifications    Notification[]
   budgetEstimates  BudgetEstimate[]
   auditLogs        AuditLog[]
   recEvents        RecEvent[]
@@ -252,21 +243,6 @@ model Payment {
   updatedAt DateTime      @updatedAt
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-}
-
-model Notification {
-  id        String           @id @default(uuid())
-  userId    String
-  type      NotificationType
-  title     String
-  body      String
-  data      Json?
-  readAt    DateTime?
-  createdAt DateTime         @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, readAt])
 }
 
 model RefreshToken {

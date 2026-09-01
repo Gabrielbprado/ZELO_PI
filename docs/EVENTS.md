@@ -78,10 +78,57 @@ PK composta, a transação inteira dá rollback e a mensagem é tratada como dup
 Em dev: `docker compose up` já sobe o `rabbitmq` (UI em `:15672`, guest/guest). Em produção
 no Render (sem broker gerenciado no free tier), use CloudAMQP e preencha `RABBITMQ_URL`.
 
+## Microserviço de notificações (Onda 3)
+
+O consumidor de `notifications.q` **saiu do backend** para um serviço próprio em
+`services/notifications/` (Node + TS + Prisma + Express). O backend agora só PUBLICA os
+eventos; quem consome, persiste o inbox e envia o push é o serviço.
+
+```
+  backend (gateway)                    RabbitMQ                 services/notifications
+  ─────────────────                    ────────                 ──────────────────────
+  GET /notifications ──HTTP──►                                  consumer notifications.q
+   notificationsClient  (X-SERVICE-TOKEN)                        ├─ persiste Notification
+   (timeout, Zod, nunca lança)  ◄──── /internal/notifications ──┤   (schema `notifications`)
+                                                                 ├─ envia push Expo
+  outbox relay ──publish──► zelo.events ──booking.created──────►└─ (id = eventId → idempotente)
+```
+
+- **Schema-per-service**: as tabelas do serviço vivem no schema `notifications` (via
+  `?schema=notifications` na `DATABASE_URL`), no MESMO Postgres, isoladas do `public`.
+  **Sem FK entre serviços**: `Notification.userId` é só texto; o acoplamento é por evento.
+- **Réplica de push token**: o serviço não acessa a tabela `User`. O backend emite
+  `user.pushtoken.set` (transacional, no outbox) quando o cliente registra o token, e o
+  serviço mantém sua cópia em `PushToken` para poder enviar o push. Eventual consistência
+  por evento — o padrão de dados de microserviço.
+- **Backend vira gateway**: `notificationsClient.service.ts` é cópia estrutural do
+  `mlClient.service.ts` — timeout, contrato Zod, **nunca lança**. Serviço fora do ar →
+  `GET /notifications` devolve lista vazia, nunca 500.
+- **Latência**: os 4 `await pushToUser` inline saíram do caminho da request
+  (`bookings`, `payments`, `messages`). A transição responde sem esperar por push.
+- **Idempotência sem tabela auxiliar**: a PK da `Notification` É o id do evento; uma
+  entrega duplicada colide na PK (P2002) e é descartada.
+
+### Caveat de entrega (honesto, para a banca)
+
+A fila `notifications.q` é **durável**: uma vez declarada pelo serviço, persiste no broker
+e retém mensagens mesmo com o serviço fora do ar — que voltam a ser entregues quando ele
+sobe. A única janela de perda é o *primeiro boot de um broker vazio*, antes de o serviço
+ter declarado a fila uma única vez; por isso o `depends_on` no compose sobe o serviço
+antes do backend. Garantia por-consumidor mais forte (ex.: `mandatory` + retorno) não
+resolve o caso multiplexado — `booking.created` também é roteado para `analytics.q` — e
+fica como evolução futura.
+
 ## Testes
 
-- **Unit** (`tests/unit/events.test.ts`): mapeamento evento→notificação, `recordEvent`,
-  contrato ida-e-volta do payload, degraus do backoff. Sem banco, sem broker.
+- **Unit** (backend `tests/unit/events.test.ts`): `recordEvent`, contrato ida-e-volta do
+  payload, degraus do backoff. Sem banco, sem broker.
+- **Serviço** (`services/notifications/tests/`): `mapper` (evento→inbox, sem deps), API
+  interna com `X-SERVICE-TOKEN` (supertest), e o ciclo com **RabbitMQ real** (gated por
+  `BROKER_TESTS=1`): publica na exchange → persiste o inbox, é idempotente, sincroniza o
+  token, e manda payload fora do contrato para a DLQ. O CI roda tudo isso.
+- **Gateway** (backend `tests/unit/notificationsClient.service.test.ts`): degradação —
+  serviço fora do ar / 5xx / corpo inválido → lista vazia, nunca exceção.
 - **Integração** (`tests/integration/events.test.ts`):
   - *sem broker* (sempre roda): evento gravado no outbox na mesma transação; booking
     rejeitado não deixa evento (atomicidade); cobertura de cada service.

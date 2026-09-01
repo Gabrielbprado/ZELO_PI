@@ -47,7 +47,6 @@ export async function truncateAll() {
     prisma.portfolioItem.deleteMany(),
     prisma.budgetEstimate.deleteMany(),
     prisma.refreshToken.deleteMany(),
-    prisma.notification.deleteMany(),
     prisma.providerProfile.deleteMany(),
     prisma.auditLog.deleteMany(),
     prisma.user.deleteMany(),

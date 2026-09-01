@@ -15,6 +15,7 @@ import { createBooking, updateBookingStatus } from '../../src/services/bookings.
 import { sendMessage } from '../../src/services/messages.service';
 import { createReview } from '../../src/services/reviews.service';
 import { confirmPayment } from '../../src/services/payments.service';
+import { setPushToken } from '../../src/services/users.service';
 import { ROUTING_KEYS } from '../../src/events/types';
 
 interface OutboxRow {
@@ -146,6 +147,17 @@ describe('outbox transacional (sem broker)', () => {
     expect(rows[0].payload.rating).toBe(5);
     expect(rows[0].payload.providerId).toBe(provider.id);
   });
+
+  it('registrar push token emite user.pushtoken.set para sincronizar a réplica do serviço', async () => {
+    const user = await createUser({ email: `tok-${Date.now()}@ev.test` });
+
+    await setPushToken(user.id, 'ExponentPushToken[abc123]');
+
+    const rows = await outbox(ROUTING_KEYS.USER_PUSHTOKEN_SET);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].payload.userId).toBe(user.id);
+    expect(rows[0].payload.pushToken).toBe('ExponentPushToken[abc123]');
+  });
 });
 
 // ─── Ciclo completo, só com um RabbitMQ real ─────────────────────────────────
@@ -164,10 +176,11 @@ async function waitFor<T>(fn: () => Promise<T | null>, tries = 40, delayMs = 100
 
 (brokerOn ? describe : describe.skip)('ciclo outbox → relay → consumidor (RabbitMQ real)', () => {
   // Import tardio: só quando o broker está ligado, para o suite sem broker nem tocar
-  // no amqplib.
+  // no amqplib. O consumidor de notificações NÃO vive mais no backend (extraído para
+  // services/notifications) — aqui resta o analytics. A publicação (relay) e o outbox
+  // marcado são verificados; a persistência do inbox é testada no serviço.
   /* eslint-disable @typescript-eslint/no-var-requires */
   const { startConsumer, stopConsumers } = require('../../src/events/consumers/runtime');
-  const { notificationsConsumer } = require('../../src/events/consumers/notifications.consumer');
   const { analyticsConsumer } = require('../../src/events/consumers/analytics.consumer');
   const { drainOutboxOnce } = require('../../src/events/relay');
   const { createConsumerChannel, disconnectAmqp } = require('../../src/config/amqp');
@@ -178,13 +191,9 @@ async function waitFor<T>(fn: () => Promise<T | null>, tries = 40, delayMs = 100
     const ch = await createConsumerChannel();
     if (!ch) return;
     const queues = [
-      mainQueue('notifications'),
       mainQueue('analytics'),
       QUEUE_DLQ,
-      ...RETRY_LEVELS.flatMap((l: { suffix: string }) => [
-        retryQueue('notifications', l.suffix),
-        retryQueue('analytics', l.suffix),
-      ]),
+      ...RETRY_LEVELS.flatMap((l: { suffix: string }) => [retryQueue('analytics', l.suffix)]),
     ];
     for (const q of queues) {
       try {
@@ -197,7 +206,6 @@ async function waitFor<T>(fn: () => Promise<T | null>, tries = 40, delayMs = 100
   }
 
   beforeAll(async () => {
-    await startConsumer(notificationsConsumer);
     await startConsumer(analyticsConsumer);
     await purgeAll();
   });
@@ -211,7 +219,7 @@ async function waitFor<T>(fn: () => Promise<T | null>, tries = 40, delayMs = 100
     await purgeAll();
   });
 
-  it('publica o evento e o consumidor persiste a notificação; o outbox fica marcado', async () => {
+  it('publica o evento e marca o outbox como publicado', async () => {
     const { provider, category, client } = await seedClientAndProvider();
     const booking = await createBooking({
       clientId: client.id,
@@ -224,15 +232,11 @@ async function waitFor<T>(fn: () => Promise<T | null>, tries = 40, delayMs = 100
 
     await drainOutboxOnce();
 
-    const notif = await waitFor(() =>
-      prisma.notification.findFirst({ where: { userId: provider.userId, type: 'BOOKING' } }),
-    );
-    expect(notif).not.toBeNull();
-
-    const row = await prisma.outboxEvent.findFirst({
-      where: { routingKey: ROUTING_KEYS.BOOKING_CREATED },
+    const row = await waitFor(async () => {
+      const r = await prisma.outboxEvent.findFirst({ where: { routingKey: ROUTING_KEYS.BOOKING_CREATED } });
+      return r?.publishedAt ? r : null;
     });
-    expect(row?.publishedAt).not.toBeNull();
+    expect(row).not.toBeNull();
     expect(booking.id).toBe((row?.payload as { bookingId: string }).bookingId);
   });
 

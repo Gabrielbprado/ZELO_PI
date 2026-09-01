@@ -83,6 +83,15 @@ services:
         sync: false
       - key: RABBITMQ_URL
         sync: false
+      # Gateway do microserviço de notificações. Desligado por padrão (o inbox vem
+      # vazio, sem 500); para ligar, aponte NOTIFICATIONS_SERVICE_URL para o serviço
+      # zelo-notifications e defina o token compartilhado.
+      - key: NOTIFICATIONS_ENABLED
+        sync: false
+      - key: NOTIFICATIONS_SERVICE_URL
+        value: https://zelo-notifications.onrender.com
+      - key: NOTIFICATIONS_SERVICE_TOKEN
+        sync: false
 
   - type: web
     name: zelo-ml
@@ -112,6 +121,37 @@ services:
         generateValue: true
       - key: ML_MODEL_POLL_SECONDS
         value: 300
+
+  - type: web
+    name: zelo-notifications
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: services/notifications
+    branch: develop
+    autoDeploy: true
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/index.js
+    healthCheckPath: /internal/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # Schema-per-service: o MESMO Postgres do backend, schema `notifications`. O Render
+      # não deixa anexar `?schema=` a um fromDatabase, então a URL é definida à mão no
+      # dashboard — a connection string do zelo-postgres com `?schema=notifications` no fim.
+      - key: DATABASE_URL
+        sync: false
+      # DEVE ser idêntico ao NOTIFICATIONS_SERVICE_TOKEN do zelo-api (é o par do
+      # X-SERVICE-TOKEN). Por isso não é generateValue: os dois lados têm de casar.
+      - key: SERVICE_TOKEN
+        sync: false
+      # CloudAMQP (não há RabbitMQ gerenciado no free tier do Render). Mesma URL do backend.
+      - key: RABBITMQ_URL
+        sync: false
+      - key: PUSH_ENABLED
+        value: 'true'
 
 databases:
   - name: zelo-postgres

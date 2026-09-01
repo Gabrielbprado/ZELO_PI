@@ -72,6 +72,9 @@ export async function getPublishChannel(): Promise<ConfirmChannel | null> {
   if (!conn) return null;
   try {
     const ch = await conn.createConfirmChannel();
+    // O relay assere a exchange no próprio canal de publicação: assim ele não depende
+    // de nenhum consumidor ter subido antes para a exchange existir. Idempotente.
+    await ch.assertExchange(env.RABBITMQ_EXCHANGE, 'topic', { durable: true });
     ch.on('error', (err: Error) => logger.warn({ err: err.message }, 'rabbitmq: erro no canal de publicação'));
     ch.on('close', () => {
       publishChannel = null;

@@ -5,6 +5,8 @@ import { BadRequestError, NotFoundError, UnauthorizedError } from '../errors';
 import { PASSWORD_RESET_TOKEN_BYTES, PASSWORD_RESET_TOKEN_TTL_MIN } from '../constants/security';
 import { ONE_MINUTE_MS } from '../constants/time';
 import { publicUserSelect } from '../selectors';
+import { recordEvent } from '../events/domainBus';
+import { ROUTING_KEYS } from '../events/types';
 
 const RESET_TOKEN_TTL_MS = PASSWORD_RESET_TOKEN_TTL_MIN * ONE_MINUTE_MS;
 const RESET_TOKEN_HASH_ALGORITHM = 'sha256';
@@ -50,9 +52,12 @@ export async function updateOwnProfile(userId: string, input: UpdateProfileInput
  * used on logout so a signed-out device stops receiving push.
  */
 export async function setPushToken(userId: string, token: string | null): Promise<void> {
-  await prisma.user.update({
-    where: { id: userId },
-    data: { pushToken: token },
+  // O backend continua dono do token; o microserviço de notificações mantém uma réplica
+  // para poder enviar push. A atualização e o evento de sincronização commitam juntos —
+  // outbox transacional, a mesma garantia dos demais eventos de domínio.
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: userId }, data: { pushToken: token } });
+    await recordEvent(tx, ROUTING_KEYS.USER_PUSHTOKEN_SET, { userId, pushToken: token });
   });
 }
 

@@ -1,7 +1,6 @@
 import { BookingStatus, Role } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
-import { pushToUser } from './notifications.service';
 import { recordEvent } from '../events/domainBus';
 import { ROUTING_KEYS, type RoutingKey } from '../events/types';
 
@@ -142,21 +141,9 @@ export async function updateBookingStatus(
     return u;
   });
 
-  // Notify the client on the two highest-value transitions.
-  if (status === 'ACCEPTED') {
-    await pushToUser(booking.clientId, {
-      title: 'Reserva aceita ✅',
-      body: `${updated.title} foi aceito pelo profissional.`,
-      data: { type: 'BOOKING', bookingId: updated.id, status },
-    });
-  } else if (status === 'COMPLETED') {
-    await pushToUser(booking.clientId, {
-      title: 'Serviço concluído 🎉',
-      body: `${updated.title} foi marcado como concluído.`,
-      data: { type: 'BOOKING', bookingId: updated.id, status },
-    });
-  }
-
+  // A notificação (inbox + push) do cliente sai agora do evento booking.accepted /
+  // booking.completed, tratado pelo microserviço de notificações. Removido o await
+  // bloqueante no caminho da request: a transição responde sem esperar por push.
   return updated;
 }
 

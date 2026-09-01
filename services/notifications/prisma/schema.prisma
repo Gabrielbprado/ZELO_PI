@@ -1,0 +1,42 @@
+// Schema do microserviço de notificações.
+//
+// Schema-per-service: as tabelas vivem no schema `notifications` (via `?schema=notifications`
+// na DATABASE_URL), no MESMO Postgres do backend, mas totalmente isoladas do schema `public`.
+// Nenhum serviço lê a tabela do outro. Não há FK para `public.User` de propósito — o
+// acoplamento entre serviços é por EVENTO, não por chave estrangeira. `userId` é só um texto;
+// o dono da identidade continua sendo o backend.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Inbox do usuário. Antes vivia no `public` do backend e nunca teve escritor;
+/// agora é deste serviço, e é o consumidor de eventos quem a preenche. O `id` NÃO tem
+/// default: ele recebe o id do evento de origem, o que faz a própria PK ser o portão de
+/// idempotência — uma entrega duplicada colide na PK e é descartada, sem tabela auxiliar.
+model Notification {
+  id        String    @id
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+/// Réplica local dos tokens de push, mantida eventualmente-consistente pelo evento
+/// `user.pushtoken.set`. O serviço precisa do token para enviar o push, mas não tem
+/// (nem deve ter) acesso à tabela `User` do backend — então guarda a sua cópia.
+model PushToken {
+  userId    String   @id
+  token     String
+  updatedAt DateTime @updatedAt
+}
