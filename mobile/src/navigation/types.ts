@@ -21,6 +21,7 @@ export type AppStackParamList = {
   ProviderProfile: { providerId: string };
   Booking: { providerId: string; categoryId: string };
   BookingDetail: { bookingId: string };
+  Tracking: { bookingId: string; providerName?: string };
   SmartBudget: undefined;
   Emergency: undefined;
   Chat: { otherUserId: string; otherName: string; otherHue?: number };

@@ -130,6 +130,11 @@ export default function BookingDetailScreen() {
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, paddingBottom: 32, gap: 8, backgroundColor: theme.colors.bg, borderTopWidth: 1, borderTopColor: theme.colors.hairline }}>
         {canAccept    && <Button loading={busy} onPress={() => change('ACCEPTED')}>Aceitar serviço</Button>}
         {canStart     && <Button loading={busy} onPress={() => change('IN_PROGRESS')}>Iniciar serviço</Button>}
+        {['ACCEPTED', 'IN_PROGRESS'].includes(booking.status) && (
+          <Button variant="secondary" onPress={() => nav.navigate('Tracking', { bookingId: booking.id })}>
+            {isProvider ? 'Compartilhar deslocamento' : 'Acompanhar deslocamento'}
+          </Button>
+        )}
         {canComplete  && <Button loading={busy} onPress={() => change('COMPLETED', booking.priceEstimate ?? undefined)}>Marcar como concluído</Button>}
         {canPay       && (
           <Button variant="primary" onPress={() => nav.navigate('Payment', { bookingId: booking.id, amount: booking.priceFinal ?? booking.priceEstimate ?? 0 })}>

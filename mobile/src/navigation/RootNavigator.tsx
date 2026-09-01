@@ -16,6 +16,7 @@ import ProviderProfileScreen from '../screens/ProviderProfileScreen';
 import BookingScreen from '../screens/BookingScreen';
 import BookingsScreen from '../screens/BookingsScreen';
 import BookingDetailScreen from '../screens/BookingDetailScreen';
+import TrackingScreen from '../screens/TrackingScreen';
 import SmartBudgetScreen from '../screens/SmartBudgetScreen';
 import EmergencyScreen from '../screens/EmergencyScreen';
 import ConversationsScreen from '../screens/ConversationsScreen';
@@ -110,6 +111,7 @@ export function RootNavigator() {
       <AppStack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
       <AppStack.Screen name="Booking" component={BookingScreen} />
       <AppStack.Screen name="BookingDetail" component={BookingDetailScreen} />
+      <AppStack.Screen name="Tracking" component={TrackingScreen} />
       <AppStack.Screen name="SmartBudget" component={SmartBudgetScreen} />
       <AppStack.Screen name="Emergency" component={EmergencyScreen} options={{ presentation: 'modal' }} />
       <AppStack.Screen name="Chat" component={ChatScreen} />

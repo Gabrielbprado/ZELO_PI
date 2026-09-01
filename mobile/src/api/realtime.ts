@@ -49,3 +49,46 @@ export function disconnectRealtime(): void {
   socket?.disconnect();
   socket = null;
 }
+
+// ─── Rastreamento de deslocamento em tempo real ──────────────────────────────
+
+export interface ProviderLocation {
+  bookingId: string;
+  lat: number;
+  lng: number;
+  at: string;
+}
+
+export interface TrackingJoinResult {
+  ok: boolean;
+  role?: 'client' | 'provider';
+  error?: string;
+}
+
+/** Entra na sala de rastreamento do booking. Resolve com o papel (cliente/profissional). */
+export async function joinTracking(bookingId: string): Promise<TrackingJoinResult> {
+  const s = await getRealtimeSocket();
+  return new Promise((resolve) => {
+    s.timeout(5000).emit('tracking:join', { bookingId }, (err: unknown, res: TrackingJoinResult) => {
+      resolve(err ? { ok: false, error: 'timeout' } : res);
+    });
+  });
+}
+
+/** Assina as atualizações de posição do profissional. Devolve um unsubscribe. */
+export async function onProviderLocation(cb: (loc: ProviderLocation) => void): Promise<() => void> {
+  const s = await getRealtimeSocket();
+  s.on('location:provider', cb);
+  return () => s.off('location:provider', cb);
+}
+
+/** (Profissional) Publica a própria posição. */
+export async function emitLocation(bookingId: string, lat: number, lng: number): Promise<void> {
+  const s = await getRealtimeSocket();
+  s.emit('location:update', { bookingId, lat, lng });
+}
+
+export async function leaveTracking(bookingId: string): Promise<void> {
+  const s = await getRealtimeSocket();
+  s.emit('tracking:leave', { bookingId });
+}

@@ -4,6 +4,7 @@ import { corsOrigins } from '../config/env';
 import { logger } from '../utils/logger';
 import { verifyAccessToken } from '../utils/tokens';
 import { realtimeBus, REALTIME_EVENTS } from './bus';
+import { registerTracking } from './tracking';
 import type { Message } from '@prisma/client';
 
 /** socket.io mount point — kept distinct from the REST API (`/api/v1`). */
@@ -76,6 +77,10 @@ export function createRealtime(httpServer: HttpServer): IOServer {
     const userId = socket.data.userId as string;
     socket.join(userRoom(userId));
     logger.debug({ userId, socketId: socket.id }, 'realtime: client connected');
+
+    // Rastreamento de deslocamento em tempo real (GPS do profissional → cliente).
+    registerTracking(io, socket);
+
     socket.on('disconnect', (reason) => {
       logger.debug({ userId, socketId: socket.id, reason }, 'realtime: client disconnected');
     });
