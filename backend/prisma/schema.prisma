@@ -69,6 +69,9 @@ model User {
   passwordResetTokenHash String?
   passwordResetExpiresAt DateTime?
   pushToken    String?
+  // Id do cliente correspondente no Asaas, criado sob demanda no 1º pagamento e reusado
+  // nos seguintes. Sem FK: é uma referência a um recurso externo.
+  asaasCustomerId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

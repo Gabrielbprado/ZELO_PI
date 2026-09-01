@@ -73,6 +73,15 @@ const schema = z.object({
   // header Bearer não. Defaults só de DEV; sobrescreva em qualquer ambiente exposto.
   ADMIN_UI_USER: z.string().default('admin'),
   ADMIN_UI_PASSWORD: z.string().default('zelo-admin'),
+  // Asaas (gateway de pagamento). Dependência OPCIONAL: com ASAAS_ENABLED=false o fluxo de
+  // pagamento usa o PIX mock (dev/demo sem conta no gateway). Ligado, gera cobrança PIX
+  // real e confirma pelo webhook do Asaas. Base URL default é o SANDBOX de propósito.
+  ASAAS_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  ASAAS_BASE_URL: z.string().url().default('https://sandbox.asaas.com/api/v3'),
+  ASAAS_API_KEY: z.string().optional(),
+  // Token que o Asaas envia no header `asaas-access-token` do webhook; valida a origem.
+  ASAAS_WEBHOOK_TOKEN: z.string().optional(),
+  ASAAS_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
 }).superRefine((cfg, ctx) => {
   // Um serviço de ranking aberto sem token receberia userId e coordenadas de
   // qualquer um. Se a integração está ligada e apontada para algum lugar, o
@@ -82,6 +91,16 @@ const schema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['ML_SERVICE_TOKEN'],
       message: 'ML_SERVICE_TOKEN é obrigatório quando ML_SERVICE_URL está definida',
+    });
+  }
+
+  // Asaas ligado sem chave de API não faz sentido — falha no boot em vez de degradar
+  // silenciosamente para o mock quando a intenção era cobrar de verdade.
+  if (cfg.ASAAS_ENABLED && !cfg.ASAAS_API_KEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['ASAAS_API_KEY'],
+      message: 'ASAAS_API_KEY é obrigatória quando ASAAS_ENABLED=true',
     });
   }
 

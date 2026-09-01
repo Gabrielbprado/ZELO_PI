@@ -24,3 +24,7 @@ process.env.ML_ENABLED = 'true';
 process.env.ML_SERVICE_URL = 'http://ml.invalido.test';
 process.env.ML_SERVICE_TOKEN = 'token_de_teste_com_16_chars';
 process.env.ML_TIMEOUT_MS = '200';
+
+// Asaas fica DESLIGADO na integração (createPayment usa o PIX mock, sem chamar a rede),
+// mas o token de webhook é definido para o teste do webhook exercitar a validação.
+process.env.ASAAS_WEBHOOK_TOKEN = 'test-webhook-token';

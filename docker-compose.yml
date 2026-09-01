@@ -144,6 +144,12 @@ services:
       NOTIFICATIONS_ENABLED: ${NOTIFICATIONS_ENABLED:-true}
       NOTIFICATIONS_SERVICE_URL: http://notifications:4100
       NOTIFICATIONS_SERVICE_TOKEN: ${NOTIFICATIONS_SERVICE_TOKEN:-dev_only_notifications_token_troque_isto}
+      # Asaas (pagamento). Desligado por padrão: o fluxo usa o PIX mock. Para cobrar de
+      # verdade, defina estes no `.env` da raiz (sandbox por padrão).
+      ASAAS_ENABLED: ${ASAAS_ENABLED:-false}
+      ASAAS_BASE_URL: ${ASAAS_BASE_URL:-https://sandbox.asaas.com/api/v3}
+      ASAAS_API_KEY: ${ASAAS_API_KEY:-}
+      ASAAS_WEBHOOK_TOKEN: ${ASAAS_WEBHOOK_TOKEN:-}
     ports:
       - "${API_PORT:-4000}:4000"
     volumes:

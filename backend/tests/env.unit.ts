@@ -14,3 +14,10 @@ process.env.NOTIFICATIONS_ENABLED = 'true';
 process.env.NOTIFICATIONS_SERVICE_URL = 'http://notifications.invalido.test';
 process.env.NOTIFICATIONS_SERVICE_TOKEN = 'service_token_com_16_chars_ok';
 process.env.NOTIFICATIONS_TIMEOUT_MS = '200';
+
+// Asaas LIGADO e apontado para o sandbox: os testes do asaasClient controlam o
+// comportamento mockando `global.fetch`. O cliente nunca deve lançar.
+process.env.ASAAS_ENABLED = 'true';
+process.env.ASAAS_API_KEY = 'test_asaas_key';
+process.env.ASAAS_BASE_URL = 'https://sandbox.asaas.com/api/v3';
+process.env.ASAAS_TIMEOUT_MS = '200';

@@ -92,6 +92,16 @@ services:
         value: https://zelo-notifications.onrender.com
       - key: NOTIFICATIONS_SERVICE_TOKEN
         sync: false
+      # Asaas (pagamento). Desligado por padrão (PIX mock). Para produção, ligue e defina a
+      # chave/token no dashboard; a base URL de produção é https://api.asaas.com/v3.
+      - key: ASAAS_ENABLED
+        sync: false
+      - key: ASAAS_BASE_URL
+        value: https://sandbox.asaas.com/api/v3
+      - key: ASAAS_API_KEY
+        sync: false
+      - key: ASAAS_WEBHOOK_TOKEN
+        sync: false
 
   - type: web
     name: zelo-ml

@@ -3,6 +3,14 @@ import { prisma } from '../config/prisma';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
 import { recordEvent } from '../events/domainBus';
 import { ROUTING_KEYS } from '../events/types';
+import { logger } from '../utils/logger';
+import {
+  createCustomer,
+  createPixPayment,
+  getPixQrCode,
+  isAsaasChargeId,
+  isAsaasConfigured,
+} from './asaasClient.service';
 
 export type PaymentMethod = 'pix' | 'card';
 
@@ -32,18 +40,18 @@ export async function createPaymentForBooking(userId: string, input: CreatePayme
     throw new BadRequestError('Valor do agendamento ainda não definido');
   }
 
+  if (booking.payment?.status === 'PAID') {
+    throw new BadRequestError('Pagamento já efetuado');
+  }
+
+  // Com o Asaas ligado e método PIX, cria a cobrança REAL e guarda o id dela (`pay_…`) em
+  // externalId. Se o gateway falhar, degrada para um id mock — o fluxo não quebra.
+  const externalId = await resolveExternalId(userId, booking.id, booking.title, amount, input.method);
+
   if (booking.payment) {
-    if (booking.payment.status === 'PAID') {
-      throw new BadRequestError('Pagamento já efetuado');
-    }
     return prisma.payment.update({
       where: { id: booking.payment.id },
-      data: {
-        amount,
-        method: input.method,
-        status: 'PENDING',
-        externalId: pseudoExternalId(input.method),
-      },
+      data: { amount, method: input.method, status: 'PENDING', externalId },
     });
   }
 
@@ -54,42 +62,110 @@ export async function createPaymentForBooking(userId: string, input: CreatePayme
       currency: PAYMENT_CURRENCY,
       method: input.method,
       status: 'PENDING',
-      externalId: pseudoExternalId(input.method),
+      externalId,
     },
   });
 }
 
-export async function confirmPayment(userId: string, bookingId: string) {
-  const payment = await prisma.payment.findUnique({
+/** Decide o externalId: cobrança real do Asaas (PIX) quando configurado, senão mock. */
+async function resolveExternalId(
+  userId: string,
+  bookingId: string,
+  title: string,
+  amount: number,
+  method: PaymentMethod,
+): Promise<string> {
+  if (method === 'pix' && isAsaasConfigured()) {
+    const charge = await createAsaasCharge(userId, bookingId, title, amount);
+    if (charge) return charge;
+    logger.warn({ bookingId }, 'asaas indisponível na criação da cobrança; usando PIX mock');
+  }
+  return pseudoExternalId(method);
+}
+
+/** Garante o cliente no Asaas (reusa o id salvo) e cria a cobrança PIX. Devolve o id ou null. */
+async function createAsaasCharge(
+  userId: string,
+  bookingId: string,
+  title: string,
+  amount: number,
+): Promise<string | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true, asaasCustomerId: true },
+  });
+  if (!user) return null;
+
+  let customerId = user.asaasCustomerId;
+  if (!customerId) {
+    customerId = await createCustomer({ name: user.name, email: user.email });
+    if (!customerId) return null;
+    await prisma.user.update({ where: { id: userId }, data: { asaasCustomerId: customerId } });
+  }
+
+  const charge = await createPixPayment({
+    customerId,
+    value: amount,
+    externalReference: bookingId,
+    description: `ZELO — ${title}`,
+  });
+  return charge?.id ?? null;
+}
+
+type PaymentWithBooking = Awaited<ReturnType<typeof findPaymentByBooking>>;
+
+function findPaymentByBooking(bookingId: string) {
+  return prisma.payment.findUnique({
     where: { bookingId },
     include: { booking: { include: { provider: { select: { userId: true } } } } },
   });
-  if (!payment) throw new NotFoundError('Pagamento não encontrado');
-  if (payment.booking.clientId !== userId) throw new ForbiddenError('Acesso negado');
-  if (payment.status === 'PAID') return payment;
+}
 
-  // `payment.confirmed` é o evento de maior risco do sistema: na Onda 7 ele vira
-  // lançamento no ledger. Por isso ele nasce DENTRO da transação que confirma o
-  // pagamento — o outbox garante que confirmar e emitir são atômicos, e que dinheiro
-  // nunca "some" entre um commit no Postgres e uma falha ao publicar no broker.
-  const updated = await prisma.$transaction(async (tx) => {
-    const u = await tx.payment.update({
-      where: { id: payment.id },
-      data: { status: 'PAID' },
-    });
+/**
+ * Marca o pagamento como PAID e emite `payment.confirmed` na MESMA transação.
+ *
+ * É o evento de maior risco do sistema: na Onda 7 ele vira lançamento no ledger. O outbox
+ * garante que confirmar e emitir são atômicos — dinheiro nunca "some" entre um commit no
+ * Postgres e uma falha ao publicar no broker. Idempotente: se já está PAID, não reemite.
+ */
+async function markPaidAndEmit(payment: NonNullable<PaymentWithBooking>) {
+  if (payment.status === 'PAID') return payment;
+  return prisma.$transaction(async (tx) => {
+    const u = await tx.payment.update({ where: { id: payment.id }, data: { status: 'PAID' } });
     await recordEvent(tx, ROUTING_KEYS.PAYMENT_CONFIRMED, {
       paymentId: u.id,
-      bookingId,
+      bookingId: payment.bookingId,
       clientId: payment.booking.clientId,
       providerUserId: payment.booking.provider.userId,
       amount: u.amount,
     });
     return u;
   });
+}
 
-  // A notificação ao profissional sai do evento payment.confirmed, tratado pelo
-  // microserviço de notificações — sem await de push no caminho da request.
-  return updated;
+/**
+ * Confirmação manual (usada no fluxo mock/dev). Com o Asaas ligado, a confirmação de
+ * verdade chega pelo WEBHOOK (`confirmPaymentByExternalId`), não por aqui.
+ */
+export async function confirmPayment(userId: string, bookingId: string) {
+  const payment = await findPaymentByBooking(bookingId);
+  if (!payment) throw new NotFoundError('Pagamento não encontrado');
+  if (payment.booking.clientId !== userId) throw new ForbiddenError('Acesso negado');
+  return markPaidAndEmit(payment);
+}
+
+/**
+ * Confirmação vinda do webhook do Asaas: acha o Payment pela cobrança (`externalId`) e o
+ * marca como pago. Idempotente e sem dono — o Asaas é a autoridade. Devolve se encontrou.
+ */
+export async function confirmPaymentByExternalId(externalId: string): Promise<boolean> {
+  const payment = await prisma.payment.findFirst({
+    where: { externalId },
+    include: { booking: { include: { provider: { select: { userId: true } } } } },
+  });
+  if (!payment) return false;
+  await markPaidAndEmit(payment);
+  return true;
 }
 
 export async function getPaymentByBooking(userId: string, bookingId: string) {
@@ -120,7 +196,7 @@ export interface PixPayload {
   currency: string;
 }
 
-/** Mock PIX copy-and-paste payload. A real gateway would return this. */
+/** Mock PIX copy-and-paste payload. Usado quando o Asaas está desligado. */
 export function buildPixPayload(amount: number, externalId: string): PixPayload {
   const payload = `00020126${externalId}5204000053039865802BR5910ZERO LTDA6009Sao Paulo62070503${externalId}6304`;
   return {
@@ -130,4 +206,31 @@ export function buildPixPayload(amount: number, externalId: string): PixPayload 
     amount,
     currency: PAYMENT_CURRENCY,
   };
+}
+
+/**
+ * Monta a resposta PIX para a tela de checkout. Com o Asaas ligado e a cobrança sendo
+ * real (`pay_…`), busca o QR Code de verdade (imagem base64 + copia-e-cola). Se o gateway
+ * falhar na hora de buscar, cai no mock — a tela nunca fica sem nada.
+ */
+export async function buildPixResponse(payment: {
+  amount: number;
+  currency: string;
+  externalId: string | null;
+  id: string;
+}): Promise<PixPayload> {
+  if (isAsaasConfigured() && isAsaasChargeId(payment.externalId)) {
+    const qr = await getPixQrCode(payment.externalId as string);
+    if (qr) {
+      return {
+        qrCode: `data:image/png;base64,${qr.encodedImage}`,
+        qrCopyPaste: qr.payload,
+        expiresInSec: PIX_EXPIRES_IN_SEC,
+        amount: payment.amount,
+        currency: payment.currency,
+      };
+    }
+    logger.warn({ paymentId: payment.id }, 'asaas: QR indisponível; usando PIX mock');
+  }
+  return buildPixPayload(payment.amount, payment.externalId ?? payment.id);
 }

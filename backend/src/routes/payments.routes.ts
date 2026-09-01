@@ -5,6 +5,11 @@ import { validate } from '../middleware/validate';
 import { bookingIdParam, paymentCreateSchema } from '../validators/payments';
 
 const router = Router();
+
+// Webhook do Asaas — ANTES do authenticate: quem chama é o gateway, não um usuário. A
+// origem é validada pelo token no header, dentro do controller.
+router.post('/webhook/asaas', ctrl.webhook);
+
 router.use(authenticate);
 
 router.post('/',                   validate(paymentCreateSchema),           ctrl.create);
