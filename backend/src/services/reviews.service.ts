@@ -15,69 +15,64 @@ export interface CreateReviewInput {
 const REVIEW_DECIMAL_PLACES = 2;
 const PROVIDER_REVIEWS_LIMIT = 50;
 
+/**
+ * Cria uma avaliação. É BIDIRECIONAL: o cliente avalia o profissional e o profissional
+ * avalia o cliente — cada um uma vez por contratação (`@@unique([bookingId, authorId])`).
+ * A nota exibida do profissional só muda quando é o CLIENTE que avalia.
+ */
 export async function createReview(authorId: string, input: CreateReviewInput) {
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
-    include: { provider: { include: { user: true } } },
+    include: { provider: { select: { id: true, userId: true } } },
   });
   if (!booking) throw new NotFoundError('Agendamento não encontrado');
-  if (booking.clientId !== authorId) {
-    throw new ForbiddenError('Apenas o contratante pode avaliar');
-  }
-  if (booking.status !== 'COMPLETED') {
-    throw new BadRequestError('Avaliação só após conclusão');
-  }
 
-  const existing = await prisma.review.findUnique({ where: { bookingId: input.bookingId } });
-  if (existing) throw new ConflictError('Esta contratação já foi avaliada');
+  const isClient = booking.clientId === authorId;
+  const isProvider = booking.provider.userId === authorId;
+  if (!isClient && !isProvider) throw new ForbiddenError('Você não participa deste agendamento');
+  if (booking.status !== 'COMPLETED') throw new BadRequestError('Avaliação só após conclusão');
 
-  const targetUserId = booking.provider.userId;
-  const nextAverage = await recalcAverage(booking.providerId, input.rating);
+  // Cliente avalia o profissional; profissional avalia o cliente.
+  const targetUserId = isClient ? booking.provider.userId : booking.clientId;
+
+  const existing = await prisma.review.findUnique({
+    where: { bookingId_authorId: { bookingId: input.bookingId, authorId } },
+  });
+  if (existing) throw new ConflictError('Você já avaliou esta contratação');
 
   const review = await prisma.$transaction(async (tx) => {
     const created = await tx.review.create({
-      data: {
-        bookingId: input.bookingId,
-        authorId,
-        targetId: targetUserId,
-        rating: input.rating,
-        comment: input.comment,
-      },
+      data: { bookingId: input.bookingId, authorId, targetId: targetUserId, rating: input.rating, comment: input.comment },
     });
-    await tx.providerProfile.update({
-      where: { id: booking.providerId },
-      data: {
-        ratingAvg: { set: nextAverage },
-        ratingCount: { increment: 1 },
-      },
-    });
+
+    // Recalcula a média do profissional por AVG REAL, dentro da transação — não é mais
+    // read-modify-write, então fecha a corrida que duas avaliações simultâneas abriam.
+    if (isClient) {
+      const agg = await tx.review.aggregate({ where: { targetId: targetUserId }, _avg: { rating: true }, _count: true });
+      await tx.providerProfile.update({
+        where: { id: booking.provider.id },
+        data: { ratingAvg: Number((agg._avg.rating ?? 0).toFixed(REVIEW_DECIMAL_PLACES)), ratingCount: agg._count },
+      });
+    }
+
     await recordEvent(tx, ROUTING_KEYS.REVIEW_CREATED, {
       reviewId: created.id,
       bookingId: input.bookingId,
       authorId,
       targetUserId,
-      providerId: booking.providerId,
+      providerId: booking.provider.id,
       rating: input.rating,
     });
     return created;
   });
 
-  // A nota entra no card e no perfil; sem invalidar, o cache serviria a média
-  // anterior por até 5 minutos logo após o cliente avaliar.
-  await Promise.all([
-    invalidateProviderCaches(booking.providerId),
-    invalidate(cacheKeys.reviews(booking.providerId)),
-  ]);
-
+  if (isClient) {
+    await Promise.all([
+      invalidateProviderCaches(booking.provider.id),
+      invalidate(cacheKeys.reviews(booking.provider.id)),
+    ]);
+  }
   return review;
-}
-
-async function recalcAverage(providerId: string, newRating: number): Promise<number> {
-  const profile = await prisma.providerProfile.findUnique({ where: { id: providerId } });
-  if (!profile) return newRating;
-  const total = profile.ratingAvg * profile.ratingCount + newRating;
-  const count = profile.ratingCount + 1;
-  return Number((total / count).toFixed(REVIEW_DECIMAL_PLACES));
 }
 
 export async function listReviewsByProvider(providerId: string) {

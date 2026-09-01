@@ -11,12 +11,14 @@ import paymentsRoutes from './payments.routes';
 import emergencyRoutes from './emergency.routes';
 import recommendationsRoutes from './recommendations.routes';
 import adminRoutes from './admin.routes';
+import reportsRoutes from './reports.routes';
 import healthRoutes from './health.routes';
 
 export const router = Router();
 
 router.use('/health', healthRoutes);
 router.use('/admin', adminRoutes);
+router.use('/reports', reportsRoutes);
 
 router.use('/auth',          authRoutes);
 router.use('/users',         usersRoutes);

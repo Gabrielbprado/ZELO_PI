@@ -37,6 +37,8 @@ export async function truncateAll() {
   await prisma.$transaction([
     prisma.outboxEvent.deleteMany(),
     prisma.processedEvent.deleteMany(),
+    prisma.report.deleteMany(),
+    prisma.providerDocument.deleteMany(),
     prisma.recEvent.deleteMany(),
     prisma.review.deleteMany(),
     prisma.message.deleteMany(),

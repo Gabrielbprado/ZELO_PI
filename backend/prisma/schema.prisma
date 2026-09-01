@@ -117,8 +117,77 @@ model ProviderProfile {
   recEvents    RecEvent[]
   availability ProviderAvailability[]
   timeOff      ProviderTimeOff[]
+  documents    ProviderDocument[]
 
   @@index([available, ratingAvg])
+}
+
+enum KycDocType {
+  CPF
+  RG
+  CNH
+  ADDRESS_PROOF
+  CERTIFICATE
+}
+
+enum DocStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Documento enviado pelo profissional para verificação (KYC). O `fileKey` é a referência
+/// ao arquivo (URL/chave de storage); a moderação é feita por um ADMIN, que aprova/rejeita
+/// e dispara a atualização do selo de verificação no perfil.
+model ProviderDocument {
+  id              String     @id @default(uuid())
+  providerId      String
+  type            KycDocType
+  fileKey         String
+  status          DocStatus  @default(PENDING)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime   @default(now())
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([providerId])
+}
+
+enum ReportReason {
+  INAPPROPRIATE
+  FRAUD
+  NO_SHOW
+  SAFETY
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+/// Denúncia de um usuário contra outro (opcionalmente ligada a um booking). Moderada por
+/// ADMIN. Ids sem FK de propósito: uma denúncia deve sobreviver mesmo que a conta alvo
+/// seja removida, para o histórico de moderação.
+model Report {
+  id           String       @id @default(uuid())
+  reporterId   String
+  targetUserId String
+  bookingId    String?
+  reason       ReportReason
+  description  String?
+  status       ReportStatus @default(OPEN)
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+
+  @@index([status, createdAt])
+  @@index([targetUserId])
 }
 
 /// Grade semanal de disponibilidade do profissional. Uma linha por janela de atendimento
@@ -225,7 +294,7 @@ model Booking {
   client   User            @relation("ClientBookings", fields: [clientId], references: [id])
   provider ProviderProfile @relation(fields: [providerId], references: [id])
   category Category        @relation(fields: [categoryId], references: [id])
-  review   Review?
+  reviews  Review[]
   payment  Payment?
   messages Message[]
 
@@ -236,7 +305,7 @@ model Booking {
 
 model Review {
   id         String   @id @default(uuid())
-  bookingId  String   @unique
+  bookingId  String
   authorId   String
   targetId   String
   rating     Int
@@ -247,6 +316,9 @@ model Review {
   author  User    @relation("Author", fields: [authorId], references: [id])
   target  User    @relation("Target", fields: [targetId], references: [id])
 
+  // Uma avaliação por AUTOR por booking: permite avaliação BIDIRECIONAL (o cliente avalia
+  // o profissional e o profissional avalia o cliente), cada um uma vez.
+  @@unique([bookingId, authorId])
   @@index([targetId])
 }
 

@@ -77,6 +77,7 @@ export interface Booking {
   category?: Category;
   provider?: { id: string; user: { id: string; name: string; avatarHue: number } };
   client?: { id: string; name: string; avatarHue: number };
+  reviews?: Array<{ id: string; authorId: string; targetId: string; rating: number; comment?: string | null }>;
 }
 
 export interface Review {

@@ -31,6 +31,8 @@ import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import ReviewScreen from '../screens/ReviewScreen';
 import ProviderManageScreen from '../screens/ProviderManageScreen';
 import AvailabilityScreen from '../screens/AvailabilityScreen';
+import KycScreen from '../screens/KycScreen';
+import ReportScreen from '../screens/ReportScreen';
 
 import type { AuthStackParamList, AppStackParamList, RootTabParamList } from './types';
 
@@ -124,6 +126,8 @@ export function RootNavigator() {
       <AppStack.Screen name="Review" component={ReviewScreen} options={{ presentation: 'modal' }} />
       <AppStack.Screen name="ProviderManage" component={ProviderManageScreen} />
       <AppStack.Screen name="Availability" component={AvailabilityScreen} />
+      <AppStack.Screen name="Kyc" component={KycScreen} />
+      <AppStack.Screen name="Report" component={ReportScreen} options={{ presentation: 'modal' }} />
     </AppStack.Navigator>
   );
 }

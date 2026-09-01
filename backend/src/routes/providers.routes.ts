@@ -11,6 +11,8 @@ import {
   serviceUpdateSchema,
 } from '../validators/providerSelf';
 import { setAvailabilitySchema, slotsSchema, timeOffSchema } from '../validators/availability';
+import * as trust from '../controllers/trust.controller';
+import { documentSchema } from '../validators/trust';
 
 const router = Router();
 
@@ -31,6 +33,10 @@ router.put   ('/me/availability', authenticate, requireRole('PROVIDER'), validat
 router.get   ('/me/time-off',     authenticate, requireRole('PROVIDER'),                                   avail.listTimeOff);
 router.post  ('/me/time-off',     authenticate, requireRole('PROVIDER'), validate(timeOffSchema),          avail.addTimeOff);
 router.delete('/me/time-off/:id', authenticate, requireRole('PROVIDER'), validate({ params: uuidParam }),  avail.removeTimeOff);
+
+// Verificação de documentos (KYC) do profissional
+router.post('/me/documents', authenticate, requireRole('PROVIDER'), validate(documentSchema), trust.submitDocument);
+router.get ('/me/documents', authenticate, requireRole('PROVIDER'),                            trust.listMyDocuments);
 
 // Público: horários livres numa data. Antes do /:id para não ser capturado por ele.
 router.get('/:id/slots', validate(slotsSchema), avail.slots);

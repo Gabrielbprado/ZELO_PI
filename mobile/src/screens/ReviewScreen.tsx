@@ -50,7 +50,7 @@ export default function ReviewScreen() {
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, paddingHorizontal: 20 }}>
         <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800', marginTop: 16 }}>
-          Como foi o serviço de {params.providerName}?
+          Avalie {params.providerName}
         </Text>
         <Text style={{ color: theme.colors.textSec, fontSize: 13, marginTop: 6 }}>
           Sua avaliação ajuda outras pessoas a contratar com confiança.

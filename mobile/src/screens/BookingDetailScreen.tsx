@@ -61,7 +61,10 @@ export default function BookingDetailScreen() {
   const canCancel = ['REQUESTED', 'ACCEPTED'].includes(booking.status);
   const isPaid = paymentStatus === 'PAID';
   const canPay = !isProvider && booking.status === 'COMPLETED' && !isPaid;
-  const canReview = !isProvider && booking.status === 'COMPLETED' && isPaid && !(booking as Booking & { review?: unknown }).review;
+  // Avaliação bidirecional: o cliente avalia após pagar; o profissional avalia após
+  // concluir. Cada um uma vez (o backend garante).
+  const alreadyReviewed = (booking.reviews ?? []).some((r) => r.authorId === user?.id);
+  const canReview = booking.status === 'COMPLETED' && !alreadyReviewed && (isProvider || isPaid);
 
   const change = async (status: 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED', priceFinal?: number) => {
     setBusy(true);
@@ -143,7 +146,7 @@ export default function BookingDetailScreen() {
         )}
         {canReview && (
           <Pressable
-            onPress={() => nav.navigate('Review', { bookingId: booking.id, providerName: booking.provider?.user.name ?? 'profissional' })}
+            onPress={() => nav.navigate('Review', { bookingId: booking.id, providerName: other?.name ?? (isProvider ? 'cliente' : 'profissional') })}
             style={({ pressed }) => ({
               flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
               paddingVertical: 14, borderRadius: theme.radius.lg,
@@ -153,7 +156,9 @@ export default function BookingDetailScreen() {
             })}
           >
             <Star size={16} color={theme.colors.star} fill={theme.colors.star} />
-            <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Avaliar este serviço</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '700' }}>
+              {isProvider ? 'Avaliar cliente' : 'Avaliar profissional'}
+            </Text>
           </Pressable>
         )}
         {isPaid && booking.status === 'COMPLETED' && (
@@ -164,6 +169,14 @@ export default function BookingDetailScreen() {
         )}
         {canCancel && (
           <Button variant="ghost" loading={busy} onPress={() => change('CANCELLED')}>Cancelar</Button>
+        )}
+        {other && (
+          <Pressable
+            onPress={() => nav.navigate('Report', { targetUserId: other.id, targetName: other.name, bookingId: booking.id })}
+            style={{ alignSelf: 'center', paddingVertical: 8 }}
+          >
+            <Text style={{ color: theme.colors.textTer, fontSize: 12, fontWeight: '600' }}>Denunciar {other.name}</Text>
+          </Pressable>
         )}
       </View>
     </SafeAreaView>

@@ -47,7 +47,7 @@ const BOOKING_INCLUDE_FULL = {
   provider: { include: { user: { select: { id: true, name: true, avatarHue: true } } } },
   client: { select: { id: true, name: true, avatarHue: true } },
   category: true,
-  review: true,
+  reviews: { select: { id: true, authorId: true, targetId: true, rating: true, comment: true } },
 } as const;
 
 export async function createBooking(input: CreateBookingInput) {

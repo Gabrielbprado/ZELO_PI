@@ -33,4 +33,6 @@ export type AppStackParamList = {
   Review: { bookingId: string; providerName: string };
   ProviderManage: undefined;
   Availability: undefined;
+  Kyc: undefined;
+  Report: { targetUserId: string; targetName?: string; bookingId?: string };
 };
