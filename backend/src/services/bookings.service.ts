@@ -1,8 +1,9 @@
-import { BookingStatus, Role } from '@prisma/client';
+import { BookingStatus, Prisma, Role } from '@prisma/client';
 import { prisma } from '../config/prisma';
-import { BadRequestError, ForbiddenError, NotFoundError } from '../errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../errors';
 import { recordEvent } from '../events/domainBus';
 import { ROUTING_KEYS, type RoutingKey } from '../events/types';
+import { invalidateSlots } from './availability.service';
 
 export type Urgency = 'EMERGENCY' | 'TODAY' | 'THIS_WEEK' | 'FLEXIBLE';
 export type AllowedBookingStatus = 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
@@ -17,10 +18,16 @@ export interface CreateBookingInput {
   scheduledAt?: string;
   urgency: Urgency;
   priceEstimate?: number;
+  durationMinutes?: number;
   // Presente quando o booking nasceu de um card de recomendação. Viaja no evento
   // `booking.created` e reabastece o sinal de conversão do recomendador.
   requestId?: string;
 }
+
+const DEFAULT_DURATION_MINUTES = 60;
+// Um booking que começa mais de 8h antes do fim do slot não pode se sobrepor a ele —
+// limita a janela de busca de conflitos ao índice [providerId, scheduledAt].
+const MAX_BOOKING_WINDOW_MS = 8 * 60 * 60 * 1000;
 
 /** Which statuses each role is allowed to apply to a booking. */
 const ALLOWED_STATUS_BY_ROLE: Readonly<Record<Role, ReadonlyArray<BookingStatus>>> = {
@@ -52,10 +59,21 @@ export async function createBooking(input: CreateBookingInput) {
   if (!category) throw new NotFoundError('Categoria não encontrada');
   if (!provider.available) throw new BadRequestError('Profissional indisponível no momento');
 
+  const duration = input.durationMinutes ?? DEFAULT_DURATION_MINUTES;
+  const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+
   // Booking e evento nascem na MESMA transação: o `booking.created` só existe se o
   // booking existe, e vice-versa. É o outbox transacional na sua forma mais simples.
-  return prisma.$transaction(async (tx) => {
-    const booking = await tx.booking.create({
+  const booking = await prisma.$transaction(async (tx) => {
+    if (scheduledAt) {
+      // Trava a linha do profissional durante a transação: serializa criações
+      // concorrentes para o MESMO profissional, fechando a corrida entre "checou livre"
+      // e "inseriu". Sem isso, dois clientes poderiam reservar o mesmo horário.
+      await tx.$executeRaw`SELECT id FROM "ProviderProfile" WHERE id = ${input.providerId} FOR UPDATE`;
+      await assertSlotFree(tx, input.providerId, scheduledAt, duration);
+    }
+
+    const created = await tx.booking.create({
       data: {
         clientId: input.clientId,
         providerId: input.providerId,
@@ -63,24 +81,54 @@ export async function createBooking(input: CreateBookingInput) {
         title: input.title,
         description: input.description,
         address: input.address,
-        scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
+        scheduledAt: scheduledAt ?? undefined,
+        durationMinutes: duration,
         urgency: input.urgency,
         priceEstimate: input.priceEstimate,
       },
     });
 
     await recordEvent(tx, ROUTING_KEYS.BOOKING_CREATED, {
-      bookingId: booking.id,
-      clientId: booking.clientId,
-      providerId: booking.providerId,
+      bookingId: created.id,
+      clientId: created.clientId,
+      providerId: created.providerId,
       providerUserId: provider.userId,
-      categoryId: booking.categoryId,
-      title: booking.title,
+      categoryId: created.categoryId,
+      title: created.title,
       recRequestId: input.requestId ?? null,
     });
 
-    return booking;
+    return created;
   });
+
+  if (scheduledAt) await invalidateSlots(input.providerId);
+  return booking;
+}
+
+/** Lança ConflictError se `[scheduledAt, +duration)` colide com um booking ativo do profissional. */
+async function assertSlotFree(
+  tx: Prisma.TransactionClient,
+  providerId: string,
+  scheduledAt: Date,
+  durationMinutes: number,
+): Promise<void> {
+  const startMs = scheduledAt.getTime();
+  const endMs = startMs + durationMinutes * 60_000;
+  const candidates = await tx.booking.findMany({
+    where: {
+      providerId,
+      status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] },
+      scheduledAt: { gte: new Date(startMs - MAX_BOOKING_WINDOW_MS), lt: new Date(endMs) },
+    },
+    select: { scheduledAt: true, durationMinutes: true },
+  });
+  const overlaps = candidates.some((b) => {
+    if (!b.scheduledAt) return false;
+    const bs = b.scheduledAt.getTime();
+    const be = bs + b.durationMinutes * 60_000;
+    return startMs < be && endMs > bs;
+  });
+  if (overlaps) throw new ConflictError('Este horário já está reservado para o profissional');
 }
 
 export async function listUserBookings(userId: string, role: Role) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, CalendarClock, ChevronRight, Plus, Trash2 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AxiosError } from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
@@ -132,6 +132,19 @@ export default function ProviderManageScreen() {
             </View>
             <Switch value={available} onValueChange={setAvailable} trackColor={{ false: theme.colors.surface2, true: theme.colors.primaryHi }} thumbColor={theme.colors.onPrimary} />
           </View>
+
+          {/* Agenda */}
+          <Pressable
+            onPress={() => nav.navigate('Availability' as never)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.hairline, padding: 14 }}
+          >
+            <CalendarClock size={20} color={theme.colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Minha agenda</Text>
+              <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>Defina os dias e horários que você atende.</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.textTer} />
+          </Pressable>
 
           {/* Bio */}
           <View style={{ gap: 6 }}>

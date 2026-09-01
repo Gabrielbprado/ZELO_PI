@@ -32,4 +32,5 @@ export type AppStackParamList = {
   ChangePassword: undefined;
   Review: { bookingId: string; providerName: string };
   ProviderManage: undefined;
+  Availability: undefined;
 };

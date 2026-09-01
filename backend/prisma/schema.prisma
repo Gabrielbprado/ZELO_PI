@@ -110,13 +110,43 @@ model ProviderProfile {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  services   ProviderService[]
-  bookings   Booking[]
-  portfolio  PortfolioItem[]
-  categories ProviderCategory[]
-  recEvents  RecEvent[]
+  services     ProviderService[]
+  bookings     Booking[]
+  portfolio    PortfolioItem[]
+  categories   ProviderCategory[]
+  recEvents    RecEvent[]
+  availability ProviderAvailability[]
+  timeOff      ProviderTimeOff[]
 
   @@index([available, ratingAvg])
+}
+
+/// Grade semanal de disponibilidade do profissional. Uma linha por janela de atendimento
+/// num dia da semana; os minutos são desde a meia-noite (ex.: 8h = 480, 18h = 1080).
+model ProviderAvailability {
+  id          String @id @default(uuid())
+  providerId  String
+  weekday     Int    // 0 = domingo … 6 = sábado
+  startMinute Int
+  endMinute   Int
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, weekday])
+}
+
+/// Bloqueios pontuais (férias, folga, compromisso) que removem horários da agenda.
+model ProviderTimeOff {
+  id         String   @id @default(uuid())
+  providerId String
+  startsAt   DateTime
+  endsAt     DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, startsAt])
 }
 
 model Category {
@@ -180,6 +210,7 @@ model Booking {
   scheduledAt DateTime?
   urgency     BookingUrgency @default(FLEXIBLE)
   status      BookingStatus  @default(REQUESTED)
+  durationMinutes Int        @default(60)
   priceEstimate Int?
   priceFinal  Int?
   // Onde o serviço foi prestado, como ponto PostGIS (SRID 4326).
@@ -200,6 +231,7 @@ model Booking {
 
   @@index([clientId, status])
   @@index([providerId, status])
+  @@index([providerId, scheduledAt])
 }
 
 model Review {

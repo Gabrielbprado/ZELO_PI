@@ -9,7 +9,14 @@ import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { useTheme } from '../contexts/ThemeContext';
 import * as bookingsApi from '../api/bookings';
+import * as availApi from '../api/availability';
 import type { AppStackParamList } from '../navigation/types';
+
+const nextDays = Array.from({ length: 7 }, (_, i) => {
+  const d = new Date(Date.now() + i * 86_400_000);
+  return { date: d.toISOString().slice(0, 10), label: d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' }) };
+});
+const slotTime = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
 const urgencies: { id: 'EMERGENCY' | 'TODAY' | 'THIS_WEEK' | 'FLEXIBLE'; label: string }[] = [
   { id: 'EMERGENCY', label: 'Agora' },
@@ -30,6 +37,24 @@ export default function BookingScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [slots, setSlots] = useState<availApi.Slot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+
+  const pickDate = async (date: string) => {
+    setSelectedDate(date);
+    setSelectedSlot(null);
+    setSlotsLoading(true);
+    try {
+      setSlots(await availApi.getSlots(params.providerId, date));
+    } catch {
+      setSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
+  };
+
   const valid = title.trim().length >= 3 && address.trim().length >= 3;
 
   const onSubmit = async () => {
@@ -44,6 +69,7 @@ export default function BookingScreen() {
         description: description.trim() || undefined,
         address: address.trim(),
         urgency,
+        scheduledAt: selectedSlot ?? undefined,
       });
       nav.replace('BookingDetail', { bookingId: booking.id });
     } catch (e) {
@@ -110,6 +136,56 @@ export default function BookingScreen() {
                 );
               })}
             </View>
+          </View>
+
+          <View>
+            <Text style={{ color: theme.colors.textSec, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
+              Horário (opcional)
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+              {nextDays.map((d) => {
+                const active = d.date === selectedDate;
+                return (
+                  <Pressable
+                    key={d.date}
+                    onPress={() => pickDate(d.date)}
+                    style={{
+                      paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+                      backgroundColor: active ? theme.colors.primaryDeep : theme.colors.surface,
+                      borderWidth: 1.5, borderColor: active ? theme.colors.primaryHi : theme.colors.hairline,
+                    }}
+                  >
+                    <Text style={{ color: active ? theme.colors.onPrimary : theme.colors.text, fontSize: 12, fontWeight: '600' }}>{d.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {selectedDate && (
+              slotsLoading ? (
+                <Text style={{ color: theme.colors.textTer, fontSize: 12 }}>Carregando horários…</Text>
+              ) : slots.length === 0 ? (
+                <Text style={{ color: theme.colors.textTer, fontSize: 12 }}>Sem horários livres neste dia.</Text>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {slots.map((s) => {
+                    const active = s.startsAt === selectedSlot;
+                    return (
+                      <Pressable
+                        key={s.startsAt}
+                        onPress={() => setSelectedSlot(active ? null : s.startsAt)}
+                        style={{
+                          paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+                          backgroundColor: active ? theme.colors.success : theme.colors.surface,
+                          borderWidth: 1.5, borderColor: active ? theme.colors.success : theme.colors.hairline,
+                        }}
+                      >
+                        <Text style={{ color: active ? theme.colors.onPrimary : theme.colors.text, fontSize: 12, fontWeight: '700' }}>{slotTime(s.startsAt)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )
+            )}
           </View>
 
           {error && <Text style={{ color: theme.colors.danger, fontSize: 13 }}>{error}</Text>}

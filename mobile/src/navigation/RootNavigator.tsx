@@ -30,6 +30,7 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import ReviewScreen from '../screens/ReviewScreen';
 import ProviderManageScreen from '../screens/ProviderManageScreen';
+import AvailabilityScreen from '../screens/AvailabilityScreen';
 
 import type { AuthStackParamList, AppStackParamList, RootTabParamList } from './types';
 
@@ -122,6 +123,7 @@ export function RootNavigator() {
       <AppStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <AppStack.Screen name="Review" component={ReviewScreen} options={{ presentation: 'modal' }} />
       <AppStack.Screen name="ProviderManage" component={ProviderManageScreen} />
+      <AppStack.Screen name="Availability" component={AvailabilityScreen} />
     </AppStack.Navigator>
   );
 }

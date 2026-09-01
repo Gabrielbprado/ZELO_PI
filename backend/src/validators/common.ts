@@ -52,6 +52,7 @@ export const bookingCreateSchema = {
     scheduledAt: z.string().datetime().optional(),
     urgency: z.enum(['EMERGENCY', 'TODAY', 'THIS_WEEK', 'FLEXIBLE']).default('FLEXIBLE'),
     priceEstimate: z.number().int().min(0).max(MAX_PRICE).optional(),
+    durationMinutes: z.number().int().min(15).max(480).optional(),
     // Origem de recomendação: o requestId do card que levou a este booking. Opcional,
     // e sem `.uuid()` de propósito — o id do carrossel não é um UUID.
     requestId: z.string().trim().min(1).max(64).optional(),
