@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, Pressable, Alert, ScrollView } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { View, Text, Pressable, Alert, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -36,11 +36,35 @@ export default function PaymentScreen() {
     }).catch(() => { /* ignore */ });
   }, [params.bookingId, nav]);
 
+  const onPaid = useCallback((amount: number) => {
+    Alert.alert('Pagamento confirmado', `R$ ${amount} pagos com sucesso.`, [
+      { text: 'Ok', onPress: () => nav.goBack() },
+    ]);
+  }, [nav]);
+
+  // Enquanto o PIX está aberto, faz polling do status: é assim que a confirmação do
+  // WEBHOOK do Asaas (assíncrona) chega à tela sem o usuário fazer nada. No fluxo mock, o
+  // botão "Já paguei" continua funcionando.
+  useEffect(() => {
+    if (!pix) return;
+    let active = true;
+    const timer = setInterval(async () => {
+      try {
+        const p = await paymentsApi.getPaymentByBooking(params.bookingId);
+        if (active && p?.status === 'PAID') {
+          clearInterval(timer);
+          onPaid(p.amount);
+        }
+      } catch { /* ignora; tenta de novo */ }
+    }, 4000);
+    return () => { active = false; clearInterval(timer); };
+  }, [pix, params.bookingId, onPaid]);
+
   const createOrConfirm = async () => {
     setBusy(true);
     setError(null);
     try {
-      // Para PIX: criamos um pagamento PENDING e mostramos código.
+      // Para PIX: criamos um pagamento PENDING e mostramos o QR/código.
       // Para cartão: criamos e confirmamos em sequência (gateway mock).
       const { payment, pix: info } = await paymentsApi.createPayment({ bookingId: params.bookingId, method });
       setPaymentId(payment.id);
@@ -50,9 +74,7 @@ export default function PaymentScreen() {
         return;
       }
       const paid = await paymentsApi.confirmPayment(params.bookingId);
-      Alert.alert('Pagamento confirmado', `R$ ${paid.amount} pagos com sucesso.`, [
-        { text: 'Ok', onPress: () => nav.goBack() },
-      ]);
+      onPaid(paid.amount);
     } catch (e) {
       setError(e instanceof AxiosError ? (e.response?.data?.error?.message ?? 'Falha no pagamento') : 'Erro');
     } finally {
@@ -64,12 +86,9 @@ export default function PaymentScreen() {
     setBusy(true);
     setError(null);
     try {
-      // Em produção, isto viria de um webhook. Aqui o cliente "confirma" manualmente
-      // para fechar o fluxo durante a integração.
+      // Fallback do fluxo mock (sem webhook): o cliente confirma manualmente.
       const paid = await paymentsApi.confirmPayment(params.bookingId);
-      Alert.alert('Pagamento confirmado', `R$ ${paid.amount} pagos com sucesso.`, [
-        { text: 'Ok', onPress: () => nav.goBack() },
-      ]);
+      onPaid(paid.amount);
     } catch (e) {
       setError(e instanceof AxiosError ? (e.response?.data?.error?.message ?? 'Falha ao confirmar') : 'Erro');
     } finally {
@@ -136,8 +155,18 @@ export default function PaymentScreen() {
           <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 16, borderWidth: 1, borderColor: theme.colors.hairline, gap: 12 }}>
             <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 15 }}>Pague com PIX</Text>
             <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>
-              Copie o código abaixo e cole no app do seu banco. O código expira em {Math.round(pix.expiresInSec / 60)} minutos.
+              Escaneie o QR Code ou copie o código e cole no app do seu banco. Expira em {Math.round(pix.expiresInSec / 60)} minutos.
             </Text>
+
+            {/* QR Code real (imagem base64 vinda do Asaas). No fluxo mock só há o código. */}
+            {pix.qrCode.startsWith('data:image') && (
+              <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                <View style={{ padding: 12, backgroundColor: theme.colors.onPrimary, borderRadius: theme.radius.md }}>
+                  <Image source={{ uri: pix.qrCode }} style={{ width: 208, height: 208 }} resizeMode="contain" />
+                </View>
+              </View>
+            )}
+
             <View style={{ backgroundColor: theme.colors.surface2, borderRadius: theme.radius.md, padding: 12 }}>
               <Text selectable style={{ color: theme.colors.text, fontSize: 11, lineHeight: 16 }} numberOfLines={4}>
                 {pix.qrCopyPaste}
@@ -166,7 +195,13 @@ export default function PaymentScreen() {
         {error && <Text style={{ color: theme.colors.danger, fontSize: 13 }}>{error}</Text>}
 
         {pix ? (
-          <Button loading={busy} onPress={confirmPix}>Já paguei, confirmar</Button>
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>Aguardando a confirmação do pagamento…</Text>
+            </View>
+            <Button variant="secondary" loading={busy} onPress={confirmPix}>Já paguei, confirmar</Button>
+          </View>
         ) : (
           <Button loading={busy} onPress={createOrConfirm}>
             {method === 'pix' ? `Gerar PIX de R$ ${params.amount}` : `Pagar R$ ${params.amount}`}
