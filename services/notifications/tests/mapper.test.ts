@@ -91,4 +91,58 @@ describe('toInbox', () => {
     });
     expect(entry).toBeNull();
   });
+
+  describe('moderação', () => {
+    const base = {
+      actionId: 'a1',
+      reportId: 'r1',
+      targetUserId: 'alvo',
+      notifyUserId: 'alvo',
+      reason: 'Fraude',
+      expiresAt: null,
+      automated: false,
+    };
+
+    it('advertência e bloqueio avisam o alvo', () => {
+      for (const type of ['WARN', 'BLOCK', 'UNBLOCK'] as const) {
+        const entry = toInbox({ id: 'e', routingKey: ROUTING_KEYS.MODERATION_ACTIONED, payload: { ...base, type } });
+        expect(entry!.userId).toBe('alvo');
+        expect(entry!.type).toBe('SYSTEM');
+        expect(entry!.body).toContain('Fraude');
+      }
+    });
+
+    it('suspensão informa o prazo', () => {
+      const entry = toInbox({
+        id: 'e',
+        routingKey: ROUTING_KEYS.MODERATION_ACTIONED,
+        payload: { ...base, type: 'SUSPEND', expiresAt: '2026-10-05T12:00:00.000Z' },
+      });
+      expect(entry!.body).toContain('05/10/2026');
+    });
+
+    it('decisão automática se identifica como tal — a pessoa precisa saber para contestar', () => {
+      const entry = toInbox({
+        id: 'e',
+        routingKey: ROUTING_KEYS.MODERATION_ACTIONED,
+        payload: { ...base, type: 'BLOCK', automated: true },
+      });
+      expect(entry!.body).toContain('automática');
+    });
+
+    it('pedido de informações vai para quem DENUNCIOU, não para o alvo', () => {
+      const entry = toInbox({
+        id: 'e',
+        routingKey: ROUTING_KEYS.MODERATION_ACTIONED,
+        payload: { ...base, type: 'REQUEST_INFO', notifyUserId: 'denunciante' },
+      });
+      expect(entry!.userId).toBe('denunciante');
+    });
+
+    it('aceitar/rejeitar não notificam ninguém — contar seria entregar a denúncia', () => {
+      for (const type of ['ACCEPT', 'REJECT'] as const) {
+        expect(toInbox({ id: 'e', routingKey: ROUTING_KEYS.MODERATION_ACTIONED, payload: { ...base, type } })).toBeNull();
+      }
+    });
+  });
 });

@@ -540,6 +540,7 @@ Segredos, blueprint e vínculo dos projetos: [`docs/DEPLOYMENT.md`](./docs/DEPLO
 | [`docs/SETUP.md`](./docs/SETUP.md) | Instalação detalhada por sistema operacional, testes, troubleshooting |
 | [`docs/DOCKER.md`](./docs/DOCKER.md) | Ambiente completo em contêineres: seed automático, perfis de ML, treino |
 | [`docs/ML.md`](./docs/ML.md) | Model card: dados, features, avaliação, limites e riscos do recomendador |
+| [`docs/MODERATION.md`](./docs/MODERATION.md) | Denúncias, classificação automática, guarda-corpos do bloqueio pela IA e decisão do admin |
 | [`docs/SECURITY.md`](./docs/SECURITY.md) | Checklist de segurança do backend |
 | [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) | Deploy em Render e Vercel: secrets, blueprint e vínculo dos projetos |
 | [`docs/BRANCHING.md`](./docs/BRANCHING.md) | Estratégia de branches e regras de proteção |

@@ -81,6 +81,14 @@ export async function authenticateUser(
     );
   }
   if (!user.isActive) throw new ForbiddenError('Conta desativada');
+  // Suspensão da moderação. Separada do `lockedUntil` acima de propósito: aquele é o
+  // bloqueio por tentativas de senha, que o próximo login bem-sucedido zera. Se os dois
+  // dividissem a mesma coluna, acertar a senha apagaria uma suspensão de 7 dias.
+  if (user.suspendedUntil && user.suspendedUntil > new Date()) {
+    throw new ForbiddenError(
+      `Conta suspensa pela moderação até ${user.suspendedUntil.toLocaleDateString('pt-BR')}.`,
+    );
+  }
 
   const passwordOk = await verifyPassword(password, user.passwordHash);
   if (!passwordOk) {

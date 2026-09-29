@@ -3,7 +3,7 @@ import { View, Text, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platf
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send } from 'lucide-react-native';
+import { ArrowLeft, Flag, Send } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from '../components/Avatar';
 import { useAuth } from '../contexts/AuthContext';
@@ -117,6 +117,18 @@ export default function ChatScreen() {
           <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{params.otherName}</Text>
           <Text style={{ color: theme.colors.success, fontSize: 11 }}>Online</Text>
         </View>
+        <Pressable
+          onPress={() => nav.navigate('Report', {
+            targetType: 'CONVERSATION',
+            targetUserId: params.otherUserId,
+            targetName: params.otherName,
+          })}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Denunciar conversa"
+        >
+          <Flag size={18} color={theme.colors.textTer} />
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>

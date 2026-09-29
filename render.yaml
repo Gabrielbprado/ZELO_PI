@@ -64,6 +64,8 @@ services:
           envVarKey: ML_SERVICE_TOKEN
       - key: ML_TIMEOUT_MS
         value: 1500
+      - key: ML_MODERATION_TIMEOUT_MS
+        value: 5000
       # Redis. O Render não oferece Redis gerenciado no plano free, então a URL
       # aponta para um provedor externo com free tier (Upstash) e é preenchida no
       # dashboard. Se ficar vazia, basta REDIS_ENABLED=false: a API sobe sem cache,

@@ -150,6 +150,77 @@ export function isMlConfigured(): boolean {
   return env.ML_ENABLED && Boolean(env.ML_SERVICE_URL && env.ML_SERVICE_TOKEN);
 }
 
+// ─── Moderação ───────────────────────────────────────────────────────────────
+
+const moderationSchema = z.object({
+  model_version: z.string(),
+  category: z.enum(['FRAUD', 'SPAM', 'INAPPROPRIATE', 'HARASSMENT', 'SAFETY', 'OFF_PLATFORM', 'NONE']),
+  severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  priority: z.number().int().min(0).max(100),
+  confidence: z.number().min(0).max(1),
+  action: z.enum(['REQUEST_INFO', 'REJECT', 'WARN', 'SUSPEND', 'BLOCK']).nullable(),
+  auto_enforce: z.boolean(),
+  suspend_days: z.number().int().positive().nullable(),
+  signals: z.array(z.object({ code: z.string(), weight: z.number(), detail: z.string().nullable().optional() })),
+  latency_ms: z.number(),
+});
+
+export type MlModerationVerdict = z.infer<typeof moderationSchema>;
+
+export interface MlModeratePayload {
+  report_id: string;
+  reason: string;
+  target_type: 'USER' | 'SERVICE' | 'CONVERSATION';
+  text: string;
+  samples: string[];
+  evidence_count: number;
+  context: Record<string, unknown>;
+}
+
+/**
+ * Classifica uma denúncia. Mesma disciplina do ranking — **nunca lança**, degrada para
+ * `null`.
+ *
+ * A degradação aqui significa outra coisa, e a diferença é o ponto: sem ranking, a Home
+ * cai para ordenação por nota e ninguém percebe; sem classificação, a denúncia fica com
+ * o veredito NULO e vai para a fila do admin sem prioridade. Nulo não é "limpo" — é
+ * "ainda não triado". Nenhuma denúncia é arquivada por falta de IA, e nenhuma punição
+ * automática acontece sem veredito. Falha do serviço só custa triagem, nunca segurança.
+ */
+export async function moderateReport(payload: MlModeratePayload): Promise<MlModerationVerdict | null> {
+  if (!isMlConfigured() || (await isOpen())) return null;
+
+  try {
+    const res = await fetch(`${env.ML_SERVICE_URL}/v1/moderate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-ML-Token': env.ML_SERVICE_TOKEN as string },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(env.ML_MODERATION_TIMEOUT_MS),
+    });
+
+    if (!res.ok) {
+      logger.warn({ status: res.status }, 'serviço de ML respondeu não-2xx ao moderar');
+      await recordFailure();
+      return null;
+    }
+
+    const parsed = moderationSchema.safeParse(await res.json());
+    if (!parsed.success) {
+      logger.warn({ issues: parsed.error.issues }, 'veredito de moderação fora do contrato');
+      await recordFailure();
+      return null;
+    }
+
+    await recordSuccess();
+    return parsed.data;
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === 'TimeoutError';
+    logger.warn({ err: timedOut ? 'timeout' : err }, 'chamada de moderação ao serviço de ML falhou');
+    await recordFailure();
+    return null;
+  }
+}
+
 export async function rankProviders(payload: MlRankPayload): Promise<MlRankResponse | null> {
   if (!isMlConfigured() || (await isOpen())) return null;
 

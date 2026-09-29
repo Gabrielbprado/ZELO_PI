@@ -1,0 +1,238 @@
+{
+  "request": {
+    "$defs": {
+      "ModerationContext": {
+        "description": "Sinais comportamentais, só contagens. É o que permite ver PADRÃO onde uma\ndenúncia isolada não mostra nada: três denunciantes distintos em 30 dias dizem\nmais sobre o alvo do que qualquer adjetivo no texto.",
+        "properties": {
+          "reporter_account_age_days": {
+            "default": 0.0,
+            "title": "Reporter Account Age Days",
+            "type": "number"
+          },
+          "reporter_reports_7d": {
+            "default": 0,
+            "title": "Reporter Reports 7D",
+            "type": "integer"
+          },
+          "target_account_age_days": {
+            "default": 0.0,
+            "title": "Target Account Age Days",
+            "type": "number"
+          },
+          "target_completed_bookings": {
+            "default": 0,
+            "title": "Target Completed Bookings",
+            "type": "integer"
+          },
+          "target_distinct_reporters_30d": {
+            "default": 0,
+            "title": "Target Distinct Reporters 30D",
+            "type": "integer"
+          },
+          "target_kyc_verified": {
+            "default": false,
+            "title": "Target Kyc Verified",
+            "type": "boolean"
+          },
+          "target_prior_suspensions": {
+            "default": 0,
+            "title": "Target Prior Suspensions",
+            "type": "integer"
+          },
+          "target_prior_warnings": {
+            "default": 0,
+            "title": "Target Prior Warnings",
+            "type": "integer"
+          },
+          "target_reports_30d": {
+            "default": 0,
+            "title": "Target Reports 30D",
+            "type": "integer"
+          }
+        },
+        "title": "ModerationContext",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "context": {
+        "$ref": "#/$defs/ModerationContext"
+      },
+      "evidence_count": {
+        "default": 0,
+        "title": "Evidence Count",
+        "type": "integer"
+      },
+      "reason": {
+        "title": "Reason",
+        "type": "string"
+      },
+      "report_id": {
+        "title": "Report Id",
+        "type": "string"
+      },
+      "samples": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 30,
+        "title": "Samples",
+        "type": "array"
+      },
+      "target_type": {
+        "default": "USER",
+        "enum": [
+          "USER",
+          "SERVICE",
+          "CONVERSATION"
+        ],
+        "title": "Target Type",
+        "type": "string"
+      },
+      "text": {
+        "default": "",
+        "title": "Text",
+        "type": "string"
+      }
+    },
+    "required": [
+      "report_id",
+      "reason"
+    ],
+    "title": "ModerateRequest",
+    "type": "object"
+  },
+  "response": {
+    "$defs": {
+      "Signal": {
+        "description": "Por que a máquina decidiu o que decidiu. Sem isto o admin teria que confiar\nnum número, e moderador que não entende a máquina para de usá-la.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "weight"
+        ],
+        "title": "Signal",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "action": {
+        "anyOf": [
+          {
+            "enum": [
+              "REQUEST_INFO",
+              "REJECT",
+              "WARN",
+              "SUSPEND",
+              "BLOCK"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Action"
+      },
+      "auto_enforce": {
+        "default": false,
+        "title": "Auto Enforce",
+        "type": "boolean"
+      },
+      "category": {
+        "enum": [
+          "FRAUD",
+          "SPAM",
+          "INAPPROPRIATE",
+          "HARASSMENT",
+          "SAFETY",
+          "OFF_PLATFORM",
+          "NONE"
+        ],
+        "title": "Category",
+        "type": "string"
+      },
+      "confidence": {
+        "maximum": 1.0,
+        "minimum": 0.0,
+        "title": "Confidence",
+        "type": "number"
+      },
+      "latency_ms": {
+        "title": "Latency Ms",
+        "type": "number"
+      },
+      "model_version": {
+        "title": "Model Version",
+        "type": "string"
+      },
+      "priority": {
+        "maximum": 100,
+        "minimum": 0,
+        "title": "Priority",
+        "type": "integer"
+      },
+      "severity": {
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "CRITICAL"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
+      "signals": {
+        "items": {
+          "$ref": "#/$defs/Signal"
+        },
+        "title": "Signals",
+        "type": "array"
+      },
+      "suspend_days": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Suspend Days"
+      }
+    },
+    "required": [
+      "model_version",
+      "category",
+      "severity",
+      "priority",
+      "confidence",
+      "latency_ms"
+    ],
+    "title": "ModerateResponse",
+    "type": "object"
+  }
+}

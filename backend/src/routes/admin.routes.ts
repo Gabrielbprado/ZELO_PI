@@ -4,7 +4,7 @@ import { validate } from '../middleware/validate';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getAdminOverview, getFunnel } from '../services/adminMetrics.service';
 import * as trust from '../controllers/trust.controller';
-import { rejectSchema, reportListQuery, reportStatusSchema } from '../validators/trust';
+import { moderationActionSchema, rejectSchema, reportListQuery, reportStatusSchema } from '../validators/trust';
 import { uuidParam } from '../validators/common';
 
 /**
@@ -29,8 +29,15 @@ router.get ('/kyc/pending',      trust.listPendingKyc);
 router.post('/kyc/:id/approve',  validate({ params: uuidParam }), trust.approveKyc);
 router.post('/kyc/:id/reject',   validate(rejectSchema),          trust.rejectKyc);
 
-// Moderação de denúncias
-router.get  ('/reports',      validate(reportListQuery),   trust.listReports);
-router.patch('/reports/:id',  validate(reportStatusSchema), trust.updateReport);
+// Moderação de denúncias. A fila vem ordenada pela prioridade que a IA atribuiu; o
+// detalhe traz o veredito, os sinais e o histórico — é o que dá ao admin condição de
+// concordar ou discordar da máquina com informação, em vez de no escuro.
+router.get  ('/reports',               validate(reportListQuery),      trust.listReports);
+router.get  ('/reports/:id',           validate({ params: uuidParam }), trust.getReport);
+router.patch('/reports/:id',           validate(reportStatusSchema),    trust.updateReport);
+router.post ('/reports/:id/reanalyze', validate({ params: uuidParam }), trust.reanalyzeReport);
+// Decisão manual — aceitar, rejeitar, pedir informações, advertir, suspender, bloquear.
+router.post ('/reports/:id/action',    validate(moderationActionSchema), trust.moderateReport);
+router.get  ('/users/:id/moderation',  validate({ params: uuidParam }), trust.userModerationHistory);
 
 export default router;

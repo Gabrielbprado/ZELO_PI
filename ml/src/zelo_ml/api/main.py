@@ -14,7 +14,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Histogram, generate_latest
 from ..logging import configure_logging
 from ..settings import settings
 from .deps import registry
-from .routes import health, model, rank
+from .routes import health, model, moderate, rank
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(rank.router)
+    app.include_router(moderate.router)
     app.include_router(model.router)
 
     @app.middleware("http")

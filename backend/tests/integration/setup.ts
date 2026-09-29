@@ -40,6 +40,7 @@ export async function truncateAll() {
     prisma.payout.deleteMany(),
     prisma.ledgerEntry.deleteMany(),
     prisma.wallet.deleteMany(),
+    prisma.moderationAction.deleteMany(),
     prisma.report.deleteMany(),
     prisma.providerDocument.deleteMany(),
     prisma.recEvent.deleteMany(),

@@ -27,6 +27,10 @@ export const ROUTING_KEYS = {
   // dono do token (o cliente o registra aqui); o serviço mantém uma cópia para enviar
   // push, atualizada por este evento — acoplamento por evento, não por FK.
   USER_PUSHTOKEN_SET: 'user.pushtoken.set',
+  // Uma decisão de moderação foi aplicada (pela IA ou por um admin). Quem reage hoje é o
+  // serviço de notificações: advertência e suspensão só existem de verdade se a pessoa
+  // souber que aconteceram.
+  MODERATION_ACTIONED: 'moderation.actioned',
 } as const;
 
 export type RoutingKey = (typeof ROUTING_KEYS)[keyof typeof ROUTING_KEYS];
@@ -94,6 +98,19 @@ const pushTokenSet = z.object({
   pushToken: z.string().nullable(),
 });
 
+const moderationActioned = z.object({
+  actionId: z.string(),
+  reportId: z.string().nullable(),
+  targetUserId: z.string(),
+  /** Quem deve ser avisado. Quase sempre o alvo — em REQUEST_INFO, o denunciante. */
+  notifyUserId: z.string(),
+  type: z.enum(['ACCEPT', 'REJECT', 'REQUEST_INFO', 'WARN', 'SUSPEND', 'BLOCK', 'UNBLOCK']),
+  reason: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  /** `true` quando quem decidiu foi a IA. Vai no texto: a pessoa tem direito de saber. */
+  automated: z.boolean(),
+});
+
 /** Registro chave→schema. É a fonte da verdade para validar e para tipar payloads. */
 export const EVENT_SCHEMAS = {
   [ROUTING_KEYS.BOOKING_CREATED]: bookingCreated,
@@ -105,6 +122,7 @@ export const EVENT_SCHEMAS = {
   [ROUTING_KEYS.REVIEW_CREATED]: reviewCreated,
   [ROUTING_KEYS.BOOKING_REMINDER]: bookingReminder,
   [ROUTING_KEYS.USER_PUSHTOKEN_SET]: pushTokenSet,
+  [ROUTING_KEYS.MODERATION_ACTIONED]: moderationActioned,
 } as const satisfies Record<RoutingKey, z.ZodTypeAny>;
 
 export type EventPayload<K extends RoutingKey> = z.infer<(typeof EVENT_SCHEMAS)[K]>;

@@ -137,6 +137,8 @@ services:
       ML_SERVICE_URL: ${ML_SERVICE_URL:-http://ml:8001}
       ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-dev_only_ml_token_troque_isto_em_producao}
       ML_TIMEOUT_MS: ${ML_TIMEOUT_MS:-2000}
+      # Moderar pode esperar mais que ranquear: quem aguarda é quem acabou de denunciar.
+      ML_MODERATION_TIMEOUT_MS: ${ML_MODERATION_TIMEOUT_MS:-4000}
       REDIS_ENABLED: ${REDIS_ENABLED:-true}
       REDIS_URL: redis://redis:6379
       RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-true}

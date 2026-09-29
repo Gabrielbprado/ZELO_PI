@@ -34,8 +34,17 @@ export type AppStackParamList = {
   ProviderManage: undefined;
   Availability: undefined;
   Kyc: undefined;
-  Report: { targetUserId: string; targetName?: string; bookingId?: string };
+  // `targetUserId` para perfil/conversa; `serviceId` para serviço (o alvo da ação é
+  // sempre o dono, resolvido no backend).
+  Report: {
+    targetType?: 'USER' | 'SERVICE' | 'CONVERSATION';
+    targetUserId?: string;
+    serviceId?: string;
+    targetName?: string;
+    bookingId?: string;
+  };
   Wallet: undefined;
   Payout: { balanceCents: number };
   AdminDashboard: undefined;
+  AdminReports: undefined;
 };

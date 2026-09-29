@@ -230,7 +230,8 @@ jobs:
       # regenerado a partir do pydantic e qualquer diferença quebra o build.
       - name: Contrato em dia
         run: |
-          python -m zelo_ml.api.schemas > contracts/rank.schema.json
+          python -m zelo_ml.api.schemas rank     > contracts/rank.schema.json
+          python -m zelo_ml.api.schemas moderate > contracts/moderate.schema.json
           git diff --exit-code contracts/
 
   mobile:

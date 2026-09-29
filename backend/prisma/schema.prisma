@@ -66,6 +66,10 @@ model User {
   emailVerified Boolean @default(false)
   failedLogins Int      @default(0)
   lockedUntil  DateTime?
+  // Suspensão aplicada pela moderação. Separada de `lockedUntil` de propósito: aquele é o
+  // bloqueio temporário por tentativas de senha, zerado no primeiro login bem-sucedido.
+  // Conflatar os dois faria um login legítimo apagar uma suspensão de 7 dias.
+  suspendedUntil DateTime?
   passwordResetTokenHash String?
   passwordResetExpiresAt DateTime?
   pushToken    String?
@@ -167,27 +171,113 @@ enum ReportReason {
 enum ReportStatus {
   OPEN
   REVIEWING
+  AWAITING_INFO
   RESOLVED
   DISMISSED
+}
+
+/// O que foi denunciado. O alvo da AÇÃO é sempre um usuário (é quem se adverte, suspende
+/// ou bloqueia); isto registra a superfície de onde a denúncia partiu, que é o que o
+/// moderador precisa ver para julgar.
+enum ReportTargetType {
+  USER
+  SERVICE
+  CONVERSATION
+}
+
+/// Categoria atribuída pela IA. Não se confunde com `ReportReason`: aquele é o que o
+/// denunciante ESCOLHEU, este é o que o classificador CONCLUIU. A divergência entre os
+/// dois é informação — denúncia marcada "Outro" que a IA classifica como FRAUD é
+/// exatamente o caso que a fila por prioridade precisa subir.
+enum ModerationCategory {
+  FRAUD
+  SPAM
+  INAPPROPRIATE
+  HARASSMENT
+  SAFETY
+  OFF_PLATFORM
+  NONE
+}
+
+enum ModerationSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Vocabulário único das decisões de moderação — usado tanto pela IA (ação sugerida ou
+/// aplicada automaticamente) quanto pelo admin.
+enum ModerationActionType {
+  AI_CLASSIFIED
+  ACCEPT
+  REJECT
+  REQUEST_INFO
+  WARN
+  SUSPEND
+  BLOCK
+  UNBLOCK
 }
 
 /// Denúncia de um usuário contra outro (opcionalmente ligada a um booking). Moderada por
 /// ADMIN. Ids sem FK de propósito: uma denúncia deve sobreviver mesmo que a conta alvo
 /// seja removida, para o histórico de moderação.
 model Report {
-  id           String       @id @default(uuid())
+  id           String           @id @default(uuid())
   reporterId   String
   targetUserId String
   bookingId    String?
+  targetType   ReportTargetType @default(USER)
+  /// Id da entidade denunciada quando não é o próprio usuário: o `ProviderService` ou o
+  /// outro participante da conversa. Sem FK, pelo mesmo motivo do resto do modelo.
+  targetRefId  String?
   reason       ReportReason
   description  String?
-  status       ReportStatus @default(OPEN)
+  /// Referências/links das evidências. O upload em si é externo, igual ao KYC.
+  evidence     String[]
+  status       ReportStatus     @default(OPEN)
   resolvedById String?
   resolvedAt   DateTime?
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime         @default(now())
+
+  // ─── Veredito da IA ────────────────────────────────────────────────────────
+  // Nulo enquanto não houver análise (serviço fora do ar, por exemplo). Nulo NÃO é
+  // "limpo": é "ainda não triado", e a fila do admin trata os dois casos diferente.
+  aiCategory     ModerationCategory?
+  aiSeverity     ModerationSeverity?
+  /// 0–100. É por ele que a fila do admin ordena.
+  aiPriority     Int?
+  aiConfidence   Float?
+  /// Ação que a IA sugeriu (ou aplicou, quando confiante o bastante).
+  aiAction       ModerationActionType?
+  /// Sinais que levaram ao veredito — explicabilidade. Sem isto o admin teria que
+  /// confiar num número, e um moderador que não entende a máquina deixa de usá-la.
+  aiSignals      Json?
+  aiModelVersion String?
+  aiAnalyzedAt   DateTime?
 
   @@index([status, createdAt])
+  @@index([status, aiPriority])
   @@index([targetUserId])
+}
+
+/// Linha do tempo da moderação: tudo o que a IA e os admins fizeram sobre um usuário.
+/// `actorId` nulo é a assinatura da IA — é o que separa "o moderador automático agiu" de
+/// "fulano agiu" sem precisar de duas tabelas.
+model ModerationAction {
+  id           String               @id @default(uuid())
+  reportId     String?
+  targetUserId String
+  actorId      String?
+  type         ModerationActionType
+  reason       String?
+  metadata     Json?
+  /// Fim da suspensão. Nulo nas ações sem prazo.
+  expiresAt    DateTime?
+  createdAt    DateTime             @default(now())
+
+  @@index([reportId])
+  @@index([targetUserId, createdAt])
 }
 
 /// Grade semanal de disponibilidade do profissional. Uma linha por janela de atendimento

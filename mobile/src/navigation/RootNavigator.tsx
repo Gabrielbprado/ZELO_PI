@@ -36,6 +36,7 @@ import ReportScreen from '../screens/ReportScreen';
 import WalletScreen from '../screens/WalletScreen';
 import PayoutScreen from '../screens/PayoutScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import AdminReportsScreen from '../screens/AdminReportsScreen';
 
 import type { AuthStackParamList, AppStackParamList, RootTabParamList } from './types';
 
@@ -134,6 +135,7 @@ export function RootNavigator() {
       <AppStack.Screen name="Wallet" component={WalletScreen} />
       <AppStack.Screen name="Payout" component={PayoutScreen} />
       <AppStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <AppStack.Screen name="AdminReports" component={AdminReportsScreen} />
     </AppStack.Navigator>
   );
 }

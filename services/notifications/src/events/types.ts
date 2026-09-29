@@ -17,6 +17,7 @@ export const ROUTING_KEYS = {
   REVIEW_CREATED: 'review.created',
   BOOKING_REMINDER: 'booking.reminder',
   USER_PUSHTOKEN_SET: 'user.pushtoken.set',
+  MODERATION_ACTIONED: 'moderation.actioned',
 } as const;
 
 export type RoutingKey = (typeof ROUTING_KEYS)[keyof typeof ROUTING_KEYS];
@@ -77,6 +78,18 @@ const pushTokenSet = z.object({
   pushToken: z.string().nullable(),
 });
 
+const moderationActioned = z.object({
+  actionId: z.string(),
+  reportId: z.string().nullable(),
+  targetUserId: z.string(),
+  /** Quem deve ser avisado. Quase sempre o alvo — em REQUEST_INFO, o denunciante. */
+  notifyUserId: z.string(),
+  type: z.enum(['ACCEPT', 'REJECT', 'REQUEST_INFO', 'WARN', 'SUSPEND', 'BLOCK', 'UNBLOCK']),
+  reason: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  automated: z.boolean(),
+});
+
 export const EVENT_SCHEMAS = {
   [ROUTING_KEYS.BOOKING_CREATED]: bookingCreated,
   [ROUTING_KEYS.BOOKING_ACCEPTED]: bookingTransition,
@@ -87,6 +100,7 @@ export const EVENT_SCHEMAS = {
   [ROUTING_KEYS.REVIEW_CREATED]: reviewCreated,
   [ROUTING_KEYS.BOOKING_REMINDER]: bookingReminder,
   [ROUTING_KEYS.USER_PUSHTOKEN_SET]: pushTokenSet,
+  [ROUTING_KEYS.MODERATION_ACTIONED]: moderationActioned,
 } as const satisfies Record<RoutingKey, z.ZodTypeAny>;
 
 export type EventPayload<K extends RoutingKey> = z.infer<(typeof EVENT_SCHEMAS)[K]>;

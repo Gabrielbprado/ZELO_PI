@@ -9,7 +9,8 @@ import { logger } from '../utils/logger';
  * auditoria não pode derrubar a ação de negócio.
  */
 export async function writeAudit(entry: {
-  userId: string;
+  /** `null` é a assinatura da IA: a moderação automática também deixa trilha. */
+  userId: string | null;
   action: string;
   entity?: string;
   entityId?: string;

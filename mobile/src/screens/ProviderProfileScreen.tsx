@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, Share2, Heart, Check, ShieldCheck, Star, ChevronRight, MessageSquare, Phone } from 'lucide-react-native';
+import { ArrowLeft, Share2, Heart, Check, ShieldCheck, Star, ChevronRight, MessageSquare, Phone, Flag } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { heroBg } from '../theme/colorFns';
@@ -42,6 +42,14 @@ export default function ProviderProfileScreen() {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable style={pillBtn(theme)}><Share2 color={theme.colors.heroFg} size={16} /></Pressable>
               <Pressable style={pillBtn(theme)}><Heart color={theme.colors.heroFg} size={16} /></Pressable>
+              <Pressable
+                onPress={() => nav.navigate('Report', { targetType: 'USER', targetUserId: pro.userId, targetName: pro.name })}
+                style={pillBtn(theme)}
+                accessibilityRole="button"
+                accessibilityLabel="Denunciar perfil"
+              >
+                <Flag color={theme.colors.heroFg} size={16} />
+              </Pressable>
             </View>
           </SafeAreaView>
 
@@ -110,15 +118,23 @@ export default function ProviderProfileScreen() {
                   key={s.id}
                   style={{
                     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                    paddingHorizontal: 14, paddingVertical: 12,
+                    paddingHorizontal: 14, paddingVertical: 12, gap: 10,
                     borderBottomWidth: i < pro.services!.length - 1 ? 1 : 0,
                     borderBottomColor: theme.colors.hairline,
                   }}
                 >
-                  <Text style={{ color: theme.colors.text, fontSize: 13 }}>{s.title}</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 13, flex: 1 }}>{s.title}</Text>
                   <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '600' }}>
                     R$ {s.priceMin}{s.priceMax && s.priceMax !== s.priceMin ? ` – ${s.priceMax}` : ''}
                   </Text>
+                  <Pressable
+                    onPress={() => nav.navigate('Report', { targetType: 'SERVICE', serviceId: s.id, targetName: s.title })}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Denunciar serviço ${s.title}`}
+                  >
+                    <Flag size={14} color={theme.colors.textTer} />
+                  </Pressable>
                 </View>
               ))}
             </View>

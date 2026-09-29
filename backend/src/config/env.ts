@@ -35,6 +35,9 @@ const schema = z.object({
   // então lá o valor sobe — mas nunca a ponto de segurar a Home: o fallback
   // por avaliação assume o lugar bem antes disso.
   ML_TIMEOUT_MS: z.coerce.number().int().positive().default(700),
+  // Moderar é mais folgado que ranquear: quem espera é quem acabou de enviar uma
+  // denúncia (uma vez), não a Home (toda sessão). Vale pagar mais para triar na hora.
+  ML_MODERATION_TIMEOUT_MS: z.coerce.number().int().positive().default(2500),
   ML_CANDIDATE_LIMIT: z.coerce.number().int().positive().max(200).default(150),
   ML_CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(3),
   ML_CIRCUIT_COOLDOWN_MS: z.coerce.number().int().positive().default(30_000),

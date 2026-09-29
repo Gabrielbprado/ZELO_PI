@@ -138,18 +138,96 @@ class HealthResponse(BaseModel):
     uptime_seconds: float
 
 
-def _dump_schema() -> str:
-    """Gera o JSON Schema versionado em `contracts/rank.schema.json`.
+# ─── Moderação ───────────────────────────────────────────────────────────────
+# Exceção CONSCIENTE à regra do topo deste arquivo ("só ids e números"): moderar é
+# julgar TEXTO, então o texto denunciado precisa atravessar a fronteira — é o objeto
+# da análise, não um enriquecimento. O que continua não atravessando: nome, e-mail,
+# telefone e endereço de quem quer que seja. O serviço não persiste o payload e loga
+# apenas contagens (mesma disciplina do /v1/rank).
+
+ModerationCategory = Literal[
+    "FRAUD", "SPAM", "INAPPROPRIATE", "HARASSMENT", "SAFETY", "OFF_PLATFORM", "NONE"
+]
+ModerationSeverity = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+#: Ações que a IA pode SUGERIR. Aceitar/rejeitar uma denúncia é juízo humano sobre o
+#: mérito; a máquina opina sobre a consequência.
+ModerationAction = Literal["REQUEST_INFO", "REJECT", "WARN", "SUSPEND", "BLOCK"]
+
+MAX_SAMPLES = 30
+
+
+class ModerationContext(BaseModel):
+    """Sinais comportamentais, só contagens. É o que permite ver PADRÃO onde uma
+    denúncia isolada não mostra nada: três denunciantes distintos em 30 dias dizem
+    mais sobre o alvo do que qualquer adjetivo no texto."""
+
+    target_reports_30d: int = 0
+    target_distinct_reporters_30d: int = 0
+    target_prior_warnings: int = 0
+    target_prior_suspensions: int = 0
+    target_account_age_days: float = 0.0
+    target_completed_bookings: int = 0
+    target_kyc_verified: bool = False
+    #: Denúncias que ESTE denunciante abriu nos últimos 7 dias. Alto = possível
+    #: retaliação/denúncia em massa, e isso segura a mão da máquina.
+    reporter_reports_7d: int = 0
+    reporter_account_age_days: float = 0.0
+
+
+class ModerateRequest(BaseModel):
+    report_id: str
+    #: Motivo escolhido pelo denunciante (enum `ReportReason` do Node).
+    reason: str
+    target_type: Literal["USER", "SERVICE", "CONVERSATION"] = "USER"
+    #: Descrição escrita pelo denunciante.
+    text: str = ""
+    #: Trechos da entidade denunciada — mensagens do alvo na conversa, título e
+    #: descrição do serviço. Vazio numa denúncia de perfil.
+    samples: list[str] = Field(default_factory=list, max_length=MAX_SAMPLES)
+    evidence_count: int = 0
+    context: ModerationContext = Field(default_factory=ModerationContext)
+
+
+class Signal(BaseModel):
+    """Por que a máquina decidiu o que decidiu. Sem isto o admin teria que confiar
+    num número, e moderador que não entende a máquina para de usá-la."""
+
+    code: str
+    weight: float
+    detail: str | None = None
+
+
+class ModerateResponse(BaseModel):
+    model_version: str
+    category: ModerationCategory
+    severity: ModerationSeverity
+    #: 0–100. É por ele que a fila do admin ordena.
+    priority: int = Field(ge=0, le=100)
+    confidence: float = Field(ge=0.0, le=1.0)
+    action: ModerationAction | None = None
+    #: True → o Node APLICA a ação sozinho. False → ela é só sugestão na fila.
+    auto_enforce: bool = False
+    suspend_days: int | None = None
+    signals: list[Signal] = Field(default_factory=list)
+    latency_ms: float
+
+
+_CONTRACTS: dict[str, tuple[type[BaseModel], type[BaseModel]]] = {
+    "rank": (RankRequest, RankResponse),
+    "moderate": (ModerateRequest, ModerateResponse),
+}
+
+
+def _dump_schema(name: str = "rank") -> str:
+    """Gera o JSON Schema versionado em `contracts/<name>.schema.json`.
 
     O CI regenera e roda `git diff --exit-code`: se alguém mudar o contrato sem
     atualizar o arquivo, o build quebra antes de o Node e o Python divergirem em
     produção.
     """
+    req, res = _CONTRACTS[name]
     return json.dumps(
-        {
-            "request": RankRequest.model_json_schema(),
-            "response": RankResponse.model_json_schema(),
-        },
+        {"request": req.model_json_schema(), "response": res.model_json_schema()},
         indent=2,
         ensure_ascii=False,
         sort_keys=True,
@@ -157,4 +235,6 @@ def _dump_schema() -> str:
 
 
 if __name__ == "__main__":  # pragma: no cover - utilitário de build
-    print(_dump_schema())
+    import sys
+
+    print(_dump_schema(sys.argv[1] if len(sys.argv) > 1 else "rank"))
