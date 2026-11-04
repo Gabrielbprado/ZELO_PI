@@ -3,22 +3,26 @@
 React Native (Expo) app for the ZELO Marketplace. Runs on iOS, Android and
 the web.
 
+> **Setup, Docker, deploy and troubleshooting live in the root
+> [`../README.md`](../README.md)** and [`../docs/SETUP.md`](../docs/SETUP.md).
+> This file only covers what's specific to the mobile package.
+
 ---
 
 ## Architecture
 
 ```
 src/
-├── api/          # one Axios module per backend resource
-├── components/   # presentational atoms (Button, Input, Avatar, Badge, …)
+├── api/          # one Axios module per backend resource; single-flight 401 refresh
+├── components/   # presentational atoms (Button, Input, Avatar, Badge, ListRow, …)
 ├── constants/    # storage keys, API config — no magic strings anywhere else
 ├── contexts/     # AuthContext, ThemeContext
 ├── hooks/        # reusable hooks (useAsync, …)
 ├── navigation/   # bottom tabs + native stacks
-├── screens/      # 17 screens (auth, marketplace, booking, chat, etc.)
+├── screens/      # 20+ screens (auth, marketplace, booking, payment, tracking, chat, …)
 ├── theme/        # light/dark palettes + tokens (spacing, radius, fonts)
 ├── types/        # shared TypeScript types matching the backend contracts
-└── utils/        # platform abstraction layer (SecureStore / AsyncStorage)
+└── utils/        # platform abstraction layer (SecureStore / AsyncStorage) + money helpers
 ```
 
 Design choices worth knowing:
@@ -73,5 +77,20 @@ export function MyCard() {
 
 ## Setup
 
-See [`docs/SETUP.md`](../docs/SETUP.md) — Node install, Postgres, LAN IP for a
+See [`../docs/SETUP.md`](../docs/SETUP.md) — Node install, Postgres, LAN IP for a
 physical device, etc.
+
+---
+
+## Planned: GPS tracking in background (Etapa 3)
+
+The backend side of live GPS tracking is **already implemented** (`BookingTravel`
+session, Redis-only coordinates, REST + Socket.IO). The mobile side depends on
+`react-native-maps` + `expo-location` + a foreground service on Android and
+Background Modes on iOS — none of which are installed yet.
+
+Full plan with permission hooks, the `useProviderTravel` hook, the task
+handler, and the 24 mandatory physical-device test cases is in
+[`../docs/plans/ETAPA_3_MOBILE_GPS.md`](../docs/plans/ETAPA_3_MOBILE_GPS.md).
+**Do not start this work without authorization** — it needs native deps + EAS
+Build + API keys + physical devices.
