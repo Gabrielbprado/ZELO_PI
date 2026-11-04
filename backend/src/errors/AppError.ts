@@ -64,3 +64,17 @@ export class TooManyRequestsError extends AppError {
     super(HttpStatus.TOO_MANY_REQUESTS, ErrorCode.TOO_MANY_REQUESTS, message);
   }
 }
+
+/** Recurso existia mas foi encerrado permanentemente. Semântica distinta de 404. */
+export class GoneError extends AppError {
+  constructor(message = 'Recurso encerrado') {
+    super(HttpStatus.GONE, ErrorCode.NOT_FOUND, message);
+  }
+}
+
+/** Dependência externa (Redis, serviço) está fora — degradação explícita. */
+export class ServiceUnavailableError extends AppError {
+  constructor(message = 'Serviço temporariamente indisponível') {
+    super(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.INTERNAL_ERROR, message);
+  }
+}

@@ -6,4 +6,6 @@ export {
   NotFoundError,
   ConflictError,
   TooManyRequestsError,
+  GoneError,
+  ServiceUnavailableError,
 } from './AppError';

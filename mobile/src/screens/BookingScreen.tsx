@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { View, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { AxiosError } from 'axios';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { Input } from '../components/Input';
@@ -33,6 +33,7 @@ export default function BookingScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [needsOnSiteQuote, setNeedsOnSiteQuote] = useState(false);
   const [urgency, setUrgency] = useState<'EMERGENCY' | 'TODAY' | 'THIS_WEEK' | 'FLEXIBLE'>('THIS_WEEK');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +71,7 @@ export default function BookingScreen() {
         address: address.trim(),
         urgency,
         scheduledAt: selectedSlot ?? undefined,
+        needsOnSiteQuote,
       });
       nav.replace('BookingDetail', { bookingId: booking.id });
     } catch (e) {
@@ -82,15 +84,21 @@ export default function BookingScreen() {
   return (
     <ScreenContainer scroll contentStyle={{ paddingHorizontal: 20 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable onPress={() => nav.goBack()} style={{ width: 40, marginTop: 8 }}>
-          <ArrowLeft color={theme.colors.text} size={22} />
+        <Pressable
+          onPress={() => nav.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+          hitSlop={8}
+          style={({ pressed }) => ({ width: 44, height: 44, marginTop: 8, marginLeft: -12, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.4 : 1 })}
+        >
+          <ChevronLeft color={theme.colors.primaryText} size={28} />
         </Pressable>
 
         <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '800', marginTop: 24, marginBottom: 6 }}>
           Solicitar serviço
         </Text>
         <Text style={{ color: theme.colors.textSec, marginBottom: 24 }}>
-          O profissional revisa e confirma — você só paga após o serviço.
+          O profissional recebe sua solicitação e envia o orçamento pelo app.
         </Text>
 
         <View style={{ gap: 16 }}>
@@ -101,8 +109,8 @@ export default function BookingScreen() {
             onChangeText={setTitle}
           />
           <Input
-            label="Detalhes (opcional)"
-            placeholder="Descreva o problema, materiais, fotos..."
+            label="Observação (opcional)"
+            placeholder="Descreva o problema, materiais, urgência, fotos..."
             value={description}
             onChangeText={setDescription}
             multiline
@@ -115,6 +123,30 @@ export default function BookingScreen() {
             value={address}
             onChangeText={setAddress}
           />
+
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12,
+              padding: 14, borderRadius: theme.radius.md,
+              backgroundColor: theme.colors.surface,
+              borderWidth: 1, borderColor: theme.colors.hairline,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700' }}>
+                Precisa de visita para orçar?
+              </Text>
+              <Text style={{ color: theme.colors.textSec, fontSize: 11, marginTop: 2 }}>
+                O profissional vai ao local antes de enviar o preço final.
+              </Text>
+            </View>
+            <Switch
+              value={needsOnSiteQuote}
+              onValueChange={setNeedsOnSiteQuote}
+              trackColor={{ true: theme.colors.primary, false: theme.colors.hairline2 }}
+              thumbColor={theme.colors.onPrimary}
+            />
+          </View>
 
           <View>
             <Text style={{ color: theme.colors.textSec, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>Urgência</Text>

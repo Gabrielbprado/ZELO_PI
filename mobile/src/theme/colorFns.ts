@@ -30,10 +30,10 @@ export function heroBg(hue: number, mode: ThemeMode): string {
 
 /** Ícone/label de categoria sobre `surface`. */
 export function categoryFg(hue: number, mode: ThemeMode): string {
-  return mode === 'dark' ? `hsl(${hue}, 70%, 72%)` : `hsl(${hue}, 55%, 38%)`;
+  return mode === 'dark' ? `hsl(${hue}, 85%, 74%)` : `hsl(${hue}, 60%, 36%)`;
 }
 
 /** Chip translúcido de categoria sobre `surface`. */
 export function categoryBg(hue: number, mode: ThemeMode): string {
-  return mode === 'dark' ? `hsla(${hue}, 40%, 55%, 0.18)` : `hsla(${hue}, 60%, 45%, 0.12)`;
+  return mode === 'dark' ? `hsla(${hue}, 70%, 60%, 0.24)` : `hsla(${hue}, 65%, 45%, 0.14)`;
 }

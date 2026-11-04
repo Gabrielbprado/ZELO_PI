@@ -33,8 +33,8 @@ export default function ConversationsScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
-        <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '800' }}>Mensagens</Text>
+      <View style={{ paddingHorizontal: theme.spacing.s5, paddingTop: 8, paddingBottom: 12 }}>
+        <Text style={{ color: theme.colors.text, ...theme.type.largeTitle }}>Mensagens</Text>
       </View>
       {loading ? (
         <SkeletonList />
@@ -58,13 +58,13 @@ export default function ConversationsScreen() {
                   flexDirection: 'row', alignItems: 'center', gap: 12,
                   padding: 12, borderRadius: theme.radius.md,
                   backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.hairline,
-                  transform: [{ scale: pressed ? 0.99 : 1 }],
+                  opacity: pressed ? 0.7 : 1,
                 })}
               >
                 <Avatar name={item.user.name} size={48} hue={item.user.avatarHue} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>
+                    <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16, letterSpacing: -0.2, flex: 1 }} numberOfLines={1}>
                       {item.user.name}
                     </Text>
                     <Text style={{ color: theme.colors.textTer, fontSize: 11 }}>

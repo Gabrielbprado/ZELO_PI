@@ -2,8 +2,9 @@ import { useCallback, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Bot, ChevronDown, ChevronRight, RefreshCw, ShieldAlert } from 'lucide-react-native';
+import { Bot, ChevronDown, ChevronRight, RefreshCw, ShieldAlert } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
 import * as reportsApi from '../api/reports';
 
 /**
@@ -128,12 +129,7 @@ export default function AdminReportsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}>
-        <Pressable onPress={() => nav.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Voltar">
-          <ArrowLeft size={24} color={c.text} />
-        </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>Moderação</Text>
-      </View>
+      <PageHeader title="Moderação" subtitle="Denúncias e triagem por IA" onBack={() => nav.goBack()} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}>
         {STATUS_FILTERS.map((f) => {

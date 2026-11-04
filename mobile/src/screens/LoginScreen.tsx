@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
-import { ArrowLeft } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -43,8 +43,14 @@ export default function LoginScreen() {
   return (
     <ScreenContainer scroll contentStyle={{ paddingHorizontal: 28 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable onPress={() => nav.goBack()} style={{ width: 44, height: 44, marginTop: 8, justifyContent: 'center' }}>
-          <ArrowLeft color={theme.colors.text} size={24} />
+        <Pressable
+          onPress={() => nav.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+          hitSlop={8}
+          style={({ pressed }) => ({ width: 44, height: 44, marginTop: 8, marginLeft: -12, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.4 : 1 })}
+        >
+          <ChevronLeft color={theme.colors.primaryText} size={28} />
         </Pressable>
 
         <View style={{ marginTop: 32 }}>

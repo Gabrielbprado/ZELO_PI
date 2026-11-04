@@ -17,6 +17,9 @@ export const publicUserSelect = {
   neighborhood: true,
   emailVerified: true,
   createdAt: true,
+  // CPF é PII, mas esta projeção só é usada pelo próprio usuário (login/register/me/
+  // updateMe). Expor pra que o app saiba se já foi preenchido e pre-encha o campo.
+  cpf: true,
 } as const satisfies Prisma.UserSelect;
 
 export type PublicUser = Prisma.UserGetPayload<{ select: typeof publicUserSelect }>;
