@@ -1,7 +1,8 @@
 import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { hashPassword, validatePasswordStrength, verifyPassword } from '../utils/password';
-import { BadRequestError, NotFoundError, UnauthorizedError } from '../errors';
+import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from '../errors';
 import { PASSWORD_RESET_TOKEN_BYTES, PASSWORD_RESET_TOKEN_TTL_MIN } from '../constants/security';
 import { ONE_MINUTE_MS } from '../constants/time';
 import { publicUserSelect } from '../selectors';
@@ -18,6 +19,7 @@ export interface UpdateProfileInput {
   city?: string | null;
   neighborhood?: string | null;
   avatarHue?: number;
+  cpf?: string;
 }
 
 function hashResetToken(token: string): string {
@@ -35,16 +37,31 @@ export async function updateOwnProfile(userId: string, input: UpdateProfileInput
   if (input.city !== undefined) data.city = emptyToNull(input.city);
   if (input.neighborhood !== undefined) data.neighborhood = emptyToNull(input.neighborhood);
   if (input.avatarHue !== undefined) data.avatarHue = input.avatarHue;
+  if (input.cpf !== undefined) data.cpf = input.cpf;
 
   if (Object.keys(data).length === 0) {
     throw new BadRequestError('Nenhum campo enviado para atualização');
   }
 
-  return prisma.user.update({
-    where: { id: userId },
-    data,
-    select: publicUserSelect,
-  });
+  try {
+    return await prisma.user.update({
+      where: { id: userId },
+      data,
+      select: publicUserSelect,
+    });
+  } catch (err) {
+    // CPF tem constraint única na tabela User. Antes a update subia 500 com stack
+    // do Prisma; agora devolve 409 amigável — toca.alerta que já existe outra conta
+    // com o mesmo CPF, UX comum em marketplace que tem KYC.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError
+      && err.code === 'P2002'
+      && (err.meta?.target as string[] | string | undefined)?.toString().includes('cpf')
+    ) {
+      throw new ConflictError('CPF já cadastrado em outra conta');
+    }
+    throw err;
+  }
 }
 
 /**

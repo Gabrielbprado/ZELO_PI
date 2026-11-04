@@ -7,6 +7,9 @@ import {
   recomputeAdminOverview,
   sendBookingReminder,
 } from './processors';
+import { cleanupStalePendingPayments } from './cleanupPendingPayments.job';
+import { runRetentionCleanup } from './retentionCleanup.job';
+import { travelRedisCleanup, travelTimeoutActive } from './travelHousekeeping.job';
 
 /**
  * Camada de jobs (BullMQ).
@@ -86,6 +89,33 @@ async function registerRepeatables(): Promise<void> {
     { pattern: '0 * * * *' }, // toda hora
     { name: 'cleanup-refresh-tokens', opts: { removeOnComplete: 50, removeOnFail: 50 } },
   );
+  // Marca como FAILED os payments PENDING que passaram do TTL sem transitar (sem esse
+  // job o slot único de bookingId+externalId ficava preso para sempre e o cliente não
+  // conseguia gerar uma cobrança nova).
+  await getQueue('housekeeping')?.upsertJobScheduler(
+    'cleanup-stale-payments',
+    { pattern: '*/30 * * * *' }, // a cada 30 min
+    { name: 'cleanup-stale-payments', opts: { removeOnComplete: 50, removeOnFail: 50 } },
+  );
+  // Retenção de eventos e auditoria. O job é no-op quando RETENTION_CLEANUP_ENABLED=false
+  // (default), então agendar sempre é seguro — operador liga quando quiser.
+  await getQueue('housekeeping')?.upsertJobScheduler(
+    'retention-cleanup',
+    { pattern: '15 3 * * *' }, // todo dia às 03:15 (janela de tráfego baixo)
+    { name: 'retention-cleanup', opts: { removeOnComplete: 50, removeOnFail: 50 } },
+  );
+  // Travel: reaplica redis.del em sessões encerradas (caso o del inline tenha falhado).
+  await getQueue('housekeeping')?.upsertJobScheduler(
+    'travel-redis-cleanup',
+    { pattern: '*/2 * * * *' }, // a cada 2 min — rápido o suficiente p/ não dar sombra ao TTL.
+    { name: 'travel-redis-cleanup', opts: { removeOnComplete: 50, removeOnFail: 50 } },
+  );
+  // Travel: fecha sessões ACTIVE abandonadas há mais de N horas.
+  await getQueue('housekeeping')?.upsertJobScheduler(
+    'travel-timeout-active',
+    { pattern: '*/15 * * * *' }, // a cada 15 min é suficiente — threshold é de horas.
+    { name: 'travel-timeout-active', opts: { removeOnComplete: 50, removeOnFail: 50 } },
+  );
   await getQueue('bookings')?.upsertJobScheduler(
     'expire-stale',
     { pattern: '*/15 * * * *' }, // a cada 15 min
@@ -102,6 +132,14 @@ async function process(queue: QueueName, job: Job): Promise<unknown> {
   switch (job.name) {
     case 'cleanup-refresh-tokens':
       return cleanupExpiredRefreshTokens();
+    case 'cleanup-stale-payments':
+      return cleanupStalePendingPayments();
+    case 'retention-cleanup':
+      return runRetentionCleanup();
+    case 'travel-redis-cleanup':
+      return travelRedisCleanup();
+    case 'travel-timeout-active':
+      return travelTimeoutActive();
     case 'expire-stale':
       return expireStaleBookings();
     case 'recompute-overview':

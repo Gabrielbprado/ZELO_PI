@@ -5,6 +5,8 @@ import { AppError } from '../errors';
 import { ErrorCode, HttpStatus } from '../constants/http';
 import { logger } from '../utils/logger';
 import { isProd } from '../config/env';
+import { captureException } from '../config/sentry';
+import { getRequestId } from '../utils/requestContext';
 
 /**
  * Erros do `express.json()` não são `AppError` nem `ZodError`: o body-parser lança
@@ -75,11 +77,13 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   if (err instanceof ZodError) {
+    const fieldErrors = err.flatten().fieldErrors;
+    logger.warn({ fieldErrors, path: _req.path, method: _req.method }, 'Falha de validação');
     return send(res, HttpStatus.BAD_REQUEST, {
       error: {
         code: ErrorCode.VALIDATION_ERROR,
         message: 'Dados inválidos',
-        details: err.flatten().fieldErrors,
+        details: fieldErrors,
       },
     });
   }
@@ -99,6 +103,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   logger.error({ err }, 'Erro não tratado');
+  // Sentry recebe erros não mapeados (5xx). AppError e PrismaKnown já foram tratados
+  // acima e NÃO chegam aqui — não poluímos o Sentry com 4xx normais.
+  captureException(err, { requestId: getRequestId(), path: _req.path, method: _req.method });
 
   send(res, HttpStatus.INTERNAL_SERVER_ERROR, {
     error: {

@@ -6,7 +6,7 @@
 import { toInbox } from '../src/events/mapper';
 import { ROUTING_KEYS, type DomainEvent } from '../src/events/types';
 
-const cases: Array<{ event: DomainEvent; userId: string; type: string }> = [
+const singleEntryCases: Array<{ event: DomainEvent; userId: string; type: string }> = [
   {
     event: {
       id: 'e1',
@@ -24,15 +24,6 @@ const cases: Array<{ event: DomainEvent; userId: string; type: string }> = [
     },
     userId: 'cli',
     type: 'BOOKING',
-  },
-  {
-    event: {
-      id: 'e3',
-      routingKey: ROUTING_KEYS.PAYMENT_CONFIRMED,
-      payload: { paymentId: 'pay1', bookingId: 'b1', clientId: 'cli', providerUserId: 'prov', amount: 250 },
-    },
-    userId: 'prov',
-    type: 'SYSTEM',
   },
   {
     event: {
@@ -64,32 +55,54 @@ const cases: Array<{ event: DomainEvent; userId: string; type: string }> = [
 ];
 
 describe('toInbox', () => {
-  it.each(cases)('$event.routingKey → inbox de $userId ($type)', ({ event, userId, type }) => {
-    const entry = toInbox(event);
-    expect(entry).not.toBeNull();
-    expect(entry!.userId).toBe(userId);
-    expect(entry!.type).toBe(type);
-    expect(entry!.title.length).toBeGreaterThan(0);
-    expect(entry!.body.length).toBeGreaterThan(0);
+  it.each(singleEntryCases)('$event.routingKey → inbox de $userId ($type)', ({ event, userId, type }) => {
+    const entries = toInbox(event);
+    expect(entries).toHaveLength(1);
+    const entry = entries[0];
+    expect(entry.userId).toBe(userId);
+    expect(entry.type).toBe(type);
+    expect(entry.title.length).toBeGreaterThan(0);
+    expect(entry.body.length).toBeGreaterThan(0);
+  });
+
+  it('payment.confirmed notifica cliente e profissional', () => {
+    const entries = toInbox({
+      id: 'e3',
+      routingKey: ROUTING_KEYS.PAYMENT_CONFIRMED,
+      payload: { paymentId: 'pay1', bookingId: 'b1', clientId: 'cli', providerUserId: 'prov', amount: 250 },
+    });
+    expect(entries).toHaveLength(2);
+
+    const client = entries.find((e) => e.userId === 'cli');
+    const provider = entries.find((e) => e.userId === 'prov');
+    expect(client).toBeDefined();
+    expect(provider).toBeDefined();
+    // Sufixo distinto garante id único por Notification e evita colisão na PK ao persistir.
+    expect(client!.suffix).toBe('c');
+    expect(provider!.suffix).toBe('p');
+    expect(client!.type).toBe('SYSTEM');
+    expect(provider!.type).toBe('SYSTEM');
+    expect(client!.body).toMatch(/pagamento|liberado/i);
+    expect(provider!.body).toMatch(/liberado|recebi|confirmad/i);
   });
 
   it('message usa a prévia como corpo', () => {
-    const entry = toInbox({
+    const [entry] = toInbox({
       id: 'm',
       routingKey: ROUTING_KEYS.MESSAGE_CREATED,
       payload: { messageId: 'm1', senderId: 'a', receiverId: 'b', senderName: 'Ana', preview: 'bom dia' },
     });
-    expect(entry!.body).toBe('bom dia');
-    expect(entry!.title).toContain('Ana');
+    expect(entry.body).toBe('bom dia');
+    expect(entry.title).toContain('Ana');
   });
 
   it('user.pushtoken.set não gera notificação', () => {
-    const entry = toInbox({
+    const entries = toInbox({
       id: 'p',
       routingKey: ROUTING_KEYS.USER_PUSHTOKEN_SET,
       payload: { userId: 'u1', pushToken: 'ExponentPushToken[x]' },
     });
-    expect(entry).toBeNull();
+    expect(entries).toEqual([]);
   });
 
   describe('moderação', () => {
@@ -105,43 +118,48 @@ describe('toInbox', () => {
 
     it('advertência e bloqueio avisam o alvo', () => {
       for (const type of ['WARN', 'BLOCK', 'UNBLOCK'] as const) {
-        const entry = toInbox({ id: 'e', routingKey: ROUTING_KEYS.MODERATION_ACTIONED, payload: { ...base, type } });
-        expect(entry!.userId).toBe('alvo');
-        expect(entry!.type).toBe('SYSTEM');
-        expect(entry!.body).toContain('Fraude');
+        const entries = toInbox({ id: 'e', routingKey: ROUTING_KEYS.MODERATION_ACTIONED, payload: { ...base, type } });
+        expect(entries).toHaveLength(1);
+        const entry = entries[0];
+        expect(entry.userId).toBe('alvo');
+        expect(entry.type).toBe('SYSTEM');
+        expect(entry.body).toContain('Fraude');
       }
     });
 
     it('suspensão informa o prazo', () => {
-      const entry = toInbox({
+      const entries = toInbox({
         id: 'e',
         routingKey: ROUTING_KEYS.MODERATION_ACTIONED,
         payload: { ...base, type: 'SUSPEND', expiresAt: '2026-10-05T12:00:00.000Z' },
       });
-      expect(entry!.body).toContain('05/10/2026');
+      expect(entries).toHaveLength(1);
+      expect(entries[0].body).toContain('05/10/2026');
     });
 
     it('decisão automática se identifica como tal — a pessoa precisa saber para contestar', () => {
-      const entry = toInbox({
+      const entries = toInbox({
         id: 'e',
         routingKey: ROUTING_KEYS.MODERATION_ACTIONED,
         payload: { ...base, type: 'BLOCK', automated: true },
       });
-      expect(entry!.body).toContain('automática');
+      expect(entries).toHaveLength(1);
+      expect(entries[0].body).toContain('automática');
     });
 
     it('pedido de informações vai para quem DENUNCIOU, não para o alvo', () => {
-      const entry = toInbox({
+      const entries = toInbox({
         id: 'e',
         routingKey: ROUTING_KEYS.MODERATION_ACTIONED,
         payload: { ...base, type: 'REQUEST_INFO', notifyUserId: 'denunciante' },
       });
-      expect(entry!.userId).toBe('denunciante');
+      expect(entries).toHaveLength(1);
+      expect(entries[0].userId).toBe('denunciante');
     });
 
     it('aceitar/rejeitar não notificam ninguém — contar seria entregar a denúncia', () => {
       for (const type of ['ACCEPT', 'REJECT'] as const) {
-        expect(toInbox({ id: 'e', routingKey: ROUTING_KEYS.MODERATION_ACTIONED, payload: { ...base, type } })).toBeNull();
+        expect(toInbox({ id: 'e', routingKey: ROUTING_KEYS.MODERATION_ACTIONED, payload: { ...base, type } })).toEqual([]);
       }
     });
   });

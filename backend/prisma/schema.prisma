@@ -53,31 +53,33 @@ enum RecEventType {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  phone        String?  @unique
-  passwordHash String
-  name         String
-  avatarHue    Int      @default(220)
-  city         String?
-  neighborhood String?
-  role         Role     @default(CLIENT)
-  isActive     Boolean  @default(true)
-  emailVerified Boolean @default(false)
-  failedLogins Int      @default(0)
-  lockedUntil  DateTime?
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  phone                  String?   @unique
+  passwordHash           String
+  name                   String
+  avatarHue              Int       @default(220)
+  city                   String?
+  neighborhood           String?
+  role                   Role      @default(CLIENT)
+  isActive               Boolean   @default(true)
+  emailVerified          Boolean   @default(false)
+  failedLogins           Int       @default(0)
+  lockedUntil            DateTime?
   // Suspensão aplicada pela moderação. Separada de `lockedUntil` de propósito: aquele é o
   // bloqueio temporário por tentativas de senha, zerado no primeiro login bem-sucedido.
   // Conflatar os dois faria um login legítimo apagar uma suspensão de 7 dias.
-  suspendedUntil DateTime?
+  suspendedUntil         DateTime?
   passwordResetTokenHash String?
   passwordResetExpiresAt DateTime?
-  pushToken    String?
+  pushToken              String?
   // Id do cliente correspondente no Asaas, criado sob demanda no 1º pagamento e reusado
   // nos seguintes. Sem FK: é uma referência a um recurso externo.
-  asaasCustomerId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  asaasCustomerId        String?
+  // CPF para pagamentos e KYC
+  cpf                    String?   @unique
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   providerProfile  ProviderProfile?
   refreshTokens    RefreshToken[]
@@ -94,25 +96,25 @@ model User {
 }
 
 model ProviderProfile {
-  id          String     @id @default(uuid())
-  userId      String     @unique
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bio         String?
-  yearsExp    Int        @default(0)
-  jobsDone    Int        @default(0)
-  ratingAvg   Float      @default(0)
-  ratingCount Int        @default(0)
-  kycStatus   KycStatus  @default(PENDING)
+  id            String                                 @id @default(uuid())
+  userId        String                                 @unique
+  user          User                                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio           String?
+  yearsExp      Int                                    @default(0)
+  jobsDone      Int                                    @default(0)
+  ratingAvg     Float                                  @default(0)
+  ratingCount   Int                                    @default(0)
+  kycStatus     KycStatus                              @default(PENDING)
   kycVerifiedAt DateTime?
-  documentCpf String?    @unique
-  available   Boolean    @default(true)
+  documentCpf   String?                                @unique
+  available     Boolean                                @default(true)
   // Real geolocation as a PostGIS geography point (SRID 4326).
   // Unsupported by Prisma Client — read/written via raw SQL (ST_*) helpers.
   // Replaces the former `latitude`/`longitude` float columns.
-  location    Unsupported("geography(Point, 4326)")?
-  priceFrom   Int        @default(0)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  location      Unsupported("geography(Point, 4326)")?
+  priceFrom     Int                                    @default(0)
+  createdAt     DateTime                               @default(now())
+  updatedAt     DateTime                               @updatedAt
 
   services     ProviderService[]
   bookings     Booking[]
@@ -122,6 +124,7 @@ model ProviderProfile {
   availability ProviderAvailability[]
   timeOff      ProviderTimeOff[]
   documents    ProviderDocument[]
+  travels      BookingTravel[]
 
   @@index([available, ratingAvg])
 }
@@ -285,7 +288,7 @@ model ModerationAction {
 model ProviderAvailability {
   id          String @id @default(uuid())
   providerId  String
-  weekday     Int    // 0 = domingo … 6 = sábado
+  weekday     Int // 0 = domingo … 6 = sábado
   startMinute Int
   endMinute   Int
 
@@ -359,27 +362,31 @@ model PortfolioItem {
 }
 
 model Booking {
-  id          String         @id @default(uuid())
-  clientId    String
-  providerId  String
-  categoryId  String
-  title       String
-  description String?
-  address     String
-  scheduledAt DateTime?
-  urgency     BookingUrgency @default(FLEXIBLE)
-  status      BookingStatus  @default(REQUESTED)
-  durationMinutes Int        @default(60)
-  priceEstimate Int?
-  priceFinal  Int?
+  id               String                                 @id @default(uuid())
+  clientId         String
+  providerId       String
+  categoryId       String
+  title            String
+  description      String?
+  address          String
+  scheduledAt      DateTime?
+  urgency          BookingUrgency                         @default(FLEXIBLE)
+  status           BookingStatus                          @default(REQUESTED)
+  durationMinutes  Int                                    @default(60)
+  priceEstimate    Int?
+  priceFinal       Int?
+  // Cliente sinaliza que o profissional precisa ir no local para orçar antes de fechar
+  // um preço final. UI usa isso para explicar ao provider "vá primeiro, oriente e envie
+  // o valor final depois" e ao cliente "o orçamento sai após a visita".
+  needsOnSiteQuote Boolean                                @default(false)
   // Onde o serviço foi prestado, como ponto PostGIS (SRID 4326).
   // Unsupported pelo Prisma Client — escrito via $executeRaw (ST_MakePoint),
   // igual a ProviderProfile.location. Usado como âncora geográfica do cliente
   // no recomendador (ST_Centroid sobre os últimos bookings).
-  location    Unsupported("geography(Point, 4326)")?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  completedAt DateTime?
+  location         Unsupported("geography(Point, 4326)")?
+  createdAt        DateTime                               @default(now())
+  updatedAt        DateTime                               @updatedAt
+  completedAt      DateTime?
 
   client   User            @relation("ClientBookings", fields: [clientId], references: [id])
   provider ProviderProfile @relation(fields: [providerId], references: [id])
@@ -387,64 +394,102 @@ model Booking {
   reviews  Review[]
   payment  Payment?
   messages Message[]
+  travel   BookingTravel?
 
   @@index([clientId, status])
   @@index([providerId, status])
   @@index([providerId, scheduledAt])
 }
 
-model Review {
-  id         String   @id @default(uuid())
-  bookingId  String
-  authorId   String
-  targetId   String
-  rating     Int
-  comment    String?
-  createdAt  DateTime @default(now())
+enum BookingTravelStatus {
+  ACTIVE
+  ARRIVED
+  CANCELLED
+}
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+/// Sessão de rastreamento em tempo real do deslocamento do provider até o cliente.
+/// Guarda SÓ metadados do ciclo de vida (status + timestamps). Coordenadas vivem no
+/// Redis (`zelo:travel:{bookingId}:location`) e são apagadas no encerramento — não
+/// há trajeto histórico em lugar algum. Decisão de privacidade explícita.
+model BookingTravel {
+  id         String              @id @default(uuid())
+  bookingId  String              @unique
+  providerId String
+  status     BookingTravelStatus
+  startedAt  DateTime            @default(now())
+  arrivedAt  DateTime?
+  endedAt    DateTime?
+  endReason  String?
+
+  booking  Booking         @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  @@index([status, startedAt])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  bookingId String
+  authorId  String
+  targetId  String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  // Restrict de propósito: reputação não evapora se alguém deletar o booking
+  // administrativamente. Se precisar REALMENTE apagar, apague a review antes.
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
   author  User    @relation("Author", fields: [authorId], references: [id])
   target  User    @relation("Target", fields: [targetId], references: [id])
 
   // Uma avaliação por AUTOR por booking: permite avaliação BIDIRECIONAL (o cliente avalia
   // o profissional e o profissional avalia o cliente), cada um uma vez.
   @@unique([bookingId, authorId])
+  @@index([bookingId, createdAt])
   @@index([targetId])
 }
 
 model Message {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   bookingId  String?
   senderId   String
   receiverId String
   content    String
   readAt     DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   booking  Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  sender   User     @relation("Sender",  fields: [senderId],   references: [id])
+  sender   User     @relation("Sender", fields: [senderId], references: [id])
   receiver User     @relation("Receiver", fields: [receiverId], references: [id])
 
   @@index([senderId, receiverId])
 }
 
 model Payment {
-  id        String        @id @default(uuid())
-  bookingId String        @unique
-  amount    Int
-  currency  String        @default("BRL")
-  method    String        @default("pix")
-  status    PaymentStatus @default(PENDING)
-  externalId String?
+  id                String        @id @default(uuid())
+  bookingId         String        @unique
+  amount            Int
+  currency          String        @default("BRL")
+  method            String        @default("pix")
+  status            PaymentStatus @default(PENDING)
+  externalId        String?       @unique
+  // Parcelamento
+  installments      Int?
+  installmentAmount Int?
+  totalAmount       Int?
   // Preenchidos na liquidação do escrow (em CENTAVOS): a comissão da plataforma e o
   // líquido do profissional. `amount` segue em reais inteiros (não migro dinheiro
   // destrutivamente); a carteira e o ledger trabalham em centavos.
-  platformFeeCents Int?
-  netAmountCents   Int?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  platformFeeCents  Int?
+  netAmountCents    Int?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  // Restrict de propósito: histórico financeiro não some junto de um booking
+  // deletado — se o DELETE escapou de um admin, o Postgres barra em vez de
+  // apagar o Payment junto. Para fluxos legítimos (cancelamento de serviço),
+  // o status do Booking/Payment transita por CANCELLED/REFUNDED, sem DELETE.
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
 }
 
 enum LedgerType {
@@ -520,12 +565,12 @@ model Payout {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   userAgent String?
   ip        String?
 
@@ -535,13 +580,13 @@ model RefreshToken {
 }
 
 model BudgetEstimate {
-  id         String   @id @default(uuid())
-  userId     String?
-  categoryId String
-  answers    Json
+  id          String   @id @default(uuid())
+  userId      String?
+  categoryId  String
+  answers     Json
   estimateMin Int
   estimateMax Int
-  createdAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

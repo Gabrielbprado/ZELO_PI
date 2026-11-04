@@ -233,23 +233,28 @@ export default function HomeScreen() {
               <Pressable
                 key={c.id}
                 onPress={() => nav.navigate('ProviderList', { category: c })}
+                accessibilityRole="button"
+                accessibilityLabel={c.name}
                 style={({ pressed }) => ({
-                  width: '23.5%',
-                  aspectRatio: 0.92,
-                  borderRadius: 14,
+                  width: '31%',
+                  flexGrow: 1,
+                  borderRadius: 16,
                   backgroundColor: theme.colors.surface,
+                  borderWidth: 1,
+                  borderColor: theme.colors.hairline,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 8,
-                  paddingHorizontal: 6,
-                  transform: [{ scale: pressed ? 0.96 : 1 }],
+                  gap: 10,
+                  paddingHorizontal: 8,
+                  paddingVertical: 16,
+                  opacity: pressed ? 0.7 : 1,
                 })}
               >
                 <View
                   style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 12,
+                    width: 48,
+                    height: 48,
+                    borderRadius: 15,
                     backgroundColor: categoryBg(c.hue, mode),
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -257,13 +262,13 @@ export default function HomeScreen() {
                 >
                   <CategoryIcon
                     iconKey={c.iconKey}
-                    size={20}
+                    size={24}
                     color={categoryFg(c.hue, mode)}
                   />
                 </View>
                 <Text
-                  numberOfLines={1}
-                  style={{ color: theme.colors.text, fontSize: 11, fontWeight: '600', textAlign: 'center' }}
+                  numberOfLines={2}
+                  style={{ color: theme.colors.text, fontSize: 12.5, fontWeight: '600', textAlign: 'center', lineHeight: 16, minHeight: 32 }}
                 >
                   {c.name}
                 </Text>

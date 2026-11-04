@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, CalendarClock, ChevronRight, Plus, ShieldCheck, Trash2, Wallet } from 'lucide-react-native';
+import { CalendarClock, ChevronRight, Plus, ShieldCheck, Trash2, Wallet } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AxiosError } from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import * as providerSelf from '../api/providerSelf';
@@ -115,12 +116,7 @@ export default function ProviderManageScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Pressable onPress={() => nav.goBack()} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-          <ArrowLeft color={theme.colors.text} size={18} />
-        </Pressable>
-        <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>Gestão profissional</Text>
-      </View>
+      <PageHeader title="Gestão profissional" onBack={() => nav.goBack()} />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 18 }}>

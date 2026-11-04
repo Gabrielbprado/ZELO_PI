@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, FlatList, ActivityIndicator } from 'react-native';
-import { ArrowLeft, Search, ShieldCheck, ChevronDown } from 'lucide-react-native';
+import { Search, ShieldCheck, ChevronDown } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
 import { ProCard } from '../components/ProCard';
 import * as providersApi from '../api/providers';
 import type { Provider } from '../types';
@@ -46,20 +47,16 @@ export default function ProviderListScreen() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Pressable onPress={() => nav.goBack()} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-          <ArrowLeft color={theme.colors.text} size={18} />
-        </Pressable>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>
-            {category?.name ?? (q ? `"${q}"` : 'Profissionais')}
-          </Text>
-          <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>{pros.length} profissionais encontrados</Text>
-        </View>
-        <Pressable style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-          <Search color={theme.colors.text} size={18} />
-        </Pressable>
-      </View>
+      <PageHeader
+        title={category?.name ?? (q ? `"${q}"` : 'Profissionais')}
+        subtitle={`${pros.length} profissionais encontrados`}
+        onBack={() => nav.goBack()}
+        right={
+          <Pressable accessibilityRole="button" accessibilityLabel="Buscar" style={{ width: theme.hit, height: theme.hit, alignItems: 'center', justifyContent: 'center' }}>
+            <Search color={theme.colors.text} size={20} />
+          </Pressable>
+        }
+      />
 
       {/* Filters */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingVertical: 8 }}>

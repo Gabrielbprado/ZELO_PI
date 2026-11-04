@@ -7,6 +7,10 @@ process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET ?? 'unit_test_acce
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? 'unit_test_refresh_secret_at_least_32_chars_long_xx';
 process.env.BCRYPT_SALT_ROUNDS = '10';
 
+// Admin UI credenciais para testes (sem defaults em produção)
+process.env.ADMIN_UI_USER = 'test-admin';
+process.env.ADMIN_UI_PASSWORD = 'test-admin-password';
+
 // Gateway de notificações LIGADO e apontado para um host inexistente: o padrão dos
 // testes é "serviço fora do ar", e o notificationsClient deve degradar (lista vazia),
 // nunca lançar. Os testes controlam o comportamento mockando `global.fetch`.
@@ -15,9 +19,10 @@ process.env.NOTIFICATIONS_SERVICE_URL = 'http://notifications.invalido.test';
 process.env.NOTIFICATIONS_SERVICE_TOKEN = 'service_token_com_16_chars_ok';
 process.env.NOTIFICATIONS_TIMEOUT_MS = '200';
 
-// Asaas LIGADO e apontado para o sandbox: os testes do asaasClient controlam o
+// Asaas LIGADO e apontado para host inexistente: os testes do asaasClient controlam o
 // comportamento mockando `global.fetch`. O cliente nunca deve lançar.
 process.env.ASAAS_ENABLED = 'true';
+process.env.ASAAS_BASE_URL = 'http://asaas.invalido.test/api/v3';
 process.env.ASAAS_API_KEY = 'test_asaas_key';
-process.env.ASAAS_BASE_URL = 'https://sandbox.asaas.com/api/v3';
+process.env.ASAAS_WEBHOOK_TOKEN = 'unit_asaas_webhook_token_32_chars_long';
 process.env.ASAAS_TIMEOUT_MS = '200';

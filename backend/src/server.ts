@@ -6,6 +6,19 @@ import { createRealtime, REALTIME_PATH } from './realtime/io';
 import { getRedis, disconnectRedis } from './config/redis';
 import { startEvents, stopEvents } from './events';
 import { startJobs, stopJobs } from './jobs';
+import { initSentry, flushSentry, captureException } from './config/sentry';
+
+// Sentry primeiro: queremos capturar qualquer falha no boot subsequente também.
+// No-op quando SENTRY_DSN não está definido.
+initSentry();
+
+// Última linha de defesa: se algo escapar de todos os try/catch, pelo menos o Sentry
+// e o logger pegam. O listener não derruba o processo — o Node já fará isso em
+// `uncaughtException`, mas garantimos observabilidade antes.
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'unhandledRejection');
+  captureException(reason);
+});
 
 const app = createApp();
 const httpServer = createServer(app);
@@ -33,8 +46,10 @@ const shutdown = (signal: string) => {
   logger.info(`${signal} recebido, encerrando...`);
   server.close(() => {
     // Encerra dependências depois do servidor HTTP: requisições em voo ainda podem
-    // querer ler do cache ou gravar no outbox enquanto drenam.
-    void Promise.allSettled([stopJobs(), stopEvents(), disconnectRedis()]).finally(() => process.exit(0));
+    // querer ler do cache ou gravar no outbox enquanto drenam. O flush do Sentry
+    // entra no mesmo lote para não perder o último batch de erros.
+    void Promise.allSettled([stopJobs(), stopEvents(), disconnectRedis(), flushSentry()])
+      .finally(() => process.exit(0));
   });
   setTimeout(() => process.exit(1), 10_000).unref();
 };

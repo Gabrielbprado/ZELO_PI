@@ -1,11 +1,13 @@
-import { View, Text, Pressable, Alert, ScrollView, Platform } from 'react-native';
+import { View, Text, Alert, ScrollView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { Settings, Bell, ShieldCheck, ChevronRight, LogOut, MessageSquare, UserCog, Briefcase, LayoutDashboard, ShieldAlert } from 'lucide-react-native';
+import { Settings, Bell, ShieldCheck, MessageSquare, UserCog, Briefcase, LayoutDashboard, ShieldAlert } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from '../components/Avatar';
+import { Section } from '../components/Section';
+import { ListRow } from '../components/ListRow';
 import { useAuth } from '../contexts/AuthContext';
 import type { AppStackParamList, RootTabParamList } from '../navigation/types';
 
@@ -20,22 +22,22 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
 
   const rows: Row[] = [
-    { id: 'edit', label: 'Editar perfil',  icon: <UserCog size={18} color={theme.colors.text} />,       kind: 'stack', to: 'EditProfile' },
-    { id: 'noti', label: 'Notificações',   icon: <Bell size={18} color={theme.colors.text} />,          kind: 'stack', to: 'Notifications' },
-    { id: 'msg',  label: 'Mensagens',      icon: <MessageSquare size={18} color={theme.colors.text} />, kind: 'tab',   to: 'MessagesTab' },
+    { id: 'edit', label: 'Editar perfil',  icon: <UserCog size={17} color={theme.colors.text} />,       kind: 'stack', to: 'EditProfile' },
+    { id: 'noti', label: 'Notificações',   icon: <Bell size={17} color={theme.colors.text} />,          kind: 'stack', to: 'Notifications' },
+    { id: 'msg',  label: 'Mensagens',      icon: <MessageSquare size={17} color={theme.colors.text} />, kind: 'tab',   to: 'MessagesTab' },
     ...(user?.role === 'PROVIDER'
-      ? [{ id: 'pro', label: 'Gestão profissional', icon: <Briefcase size={18} color={theme.colors.text} />, kind: 'stack' as const, to: 'ProviderManage' as const }]
+      ? [{ id: 'pro', label: 'Gestão profissional', icon: <Briefcase size={17} color={theme.colors.text} />, kind: 'stack' as const, to: 'ProviderManage' as const }]
       : []
     ),
     ...(user?.role === 'ADMIN'
       ? [
-          { id: 'admin', label: 'Painel administrativo', icon: <LayoutDashboard size={18} color={theme.colors.text} />, kind: 'stack' as const, to: 'AdminDashboard' as const },
-          { id: 'mod',   label: 'Moderação de denúncias', icon: <ShieldAlert size={18} color={theme.colors.text} />,    kind: 'stack' as const, to: 'AdminReports' as const },
+          { id: 'admin', label: 'Painel administrativo', icon: <LayoutDashboard size={17} color={theme.colors.text} />, kind: 'stack' as const, to: 'AdminDashboard' as const },
+          { id: 'mod',   label: 'Moderação de denúncias', icon: <ShieldAlert size={17} color={theme.colors.text} />,    kind: 'stack' as const, to: 'AdminReports' as const },
         ]
       : []
     ),
-    { id: 'sec',  label: 'Segurança e privacidade', icon: <ShieldCheck size={18} color={theme.colors.text} />, kind: 'stack', to: 'Settings' },
-    { id: 'cfg',  label: 'Configurações',  icon: <Settings size={18} color={theme.colors.text} />,      kind: 'stack', to: 'Settings' },
+    { id: 'sec',  label: 'Segurança e privacidade', icon: <ShieldCheck size={17} color={theme.colors.text} />, kind: 'stack', to: 'Settings' },
+    { id: 'cfg',  label: 'Configurações',  icon: <Settings size={17} color={theme.colors.text} />,      kind: 'stack', to: 'Settings' },
   ];
 
   const goTo = (r: Row) => {
@@ -60,57 +62,41 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
-        <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '800' }}>Perfil</Text>
+      <View style={{ paddingHorizontal: theme.spacing.s5, paddingTop: 8, paddingBottom: 12 }}>
+        <Text style={{ color: theme.colors.text, ...theme.type.largeTitle }}>Perfil</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, gap: 16, paddingBottom: 32 }}>
-        <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 16, borderWidth: 1, borderColor: theme.colors.hairline, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <Avatar name={user?.name ?? '?'} size={64} hue={user?.avatarHue ?? 220} />
+      <ScrollView contentContainerStyle={{ paddingHorizontal: theme.spacing.s5, gap: theme.spacing.s4, paddingBottom: 32 }}>
+        <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, padding: theme.spacing.s4, borderWidth: 1, borderColor: theme.colors.hairline, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <Avatar name={user?.name ?? '?'} size={60} hue={user?.avatarHue ?? 220} />
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 17 }}>{user?.name}</Text>
-            <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>{user?.email}</Text>
-            <Text style={{ color: theme.colors.primaryText, fontSize: 11, marginTop: 4, fontWeight: '700' }}>
+            <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 20, letterSpacing: -0.3 }}>{user?.name}</Text>
+            <Text style={{ color: theme.colors.textSec, fontSize: 13, marginTop: 1 }}>{user?.email}</Text>
+            <Text style={{ color: theme.colors.primaryText, fontSize: 12, marginTop: 4, fontWeight: '700' }}>
               {user?.role === 'PROVIDER' ? 'PROFISSIONAL' : 'CLIENTE'}
             </Text>
           </View>
         </View>
 
-        <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.hairline, overflow: 'hidden' }}>
+        <Section>
           {rows.map((r, i) => (
-            <Pressable
+            <ListRow
               key={r.id}
+              icon={r.icon}
+              title={r.label}
+              divider={i < rows.length - 1}
               onPress={() => goTo(r)}
-              style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center', gap: 12,
-                paddingHorizontal: 14, paddingVertical: 14,
-                borderBottomWidth: i < rows.length - 1 ? 1 : 0,
-                borderBottomColor: theme.colors.hairline,
-                backgroundColor: pressed ? theme.colors.surface2 : theme.colors.surface,
-              })}
-            >
-              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: theme.colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-                {r.icon}
-              </View>
-              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '500', flex: 1 }}>{r.label}</Text>
-              <ChevronRight size={16} color={theme.colors.textTer} />
-            </Pressable>
+            />
           ))}
-        </View>
+        </Section>
 
-        <Pressable
-          onPress={confirmLogout}
-          style={({ pressed }) => ({
-            flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
-            paddingVertical: 14, borderRadius: theme.radius.lg,
-            backgroundColor: theme.colors.dangerBg,
-            borderWidth: 1, borderColor: theme.colors.dangerBorder,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          })}
-        >
-          <LogOut size={16} color={theme.colors.danger} />
-          <Text style={{ color: theme.colors.danger, fontWeight: '700' }}>Sair</Text>
-        </Pressable>
+        <Section>
+          <ListRow
+            title="Sair"
+            destructive
+            onPress={confirmLogout}
+          />
+        </Section>
       </ScrollView>
     </SafeAreaView>
   );

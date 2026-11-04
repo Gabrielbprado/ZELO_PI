@@ -11,6 +11,15 @@ import {
 } from '../constants';
 
 /**
+ * Detecta se o app web está sendo servido pelo próprio backend (mesma origem).
+ * Isso acontece quando WEB_DIST_DIR está configurado no backend e o build do Expo
+ * é servido como arquivos estáticos. Nesse caso, usamos URL relativa para evitar CORS.
+ */
+function isSameOriginWeb(): boolean {
+  return Platform.OS === 'web' && typeof window !== 'undefined' && window.location.port === '';
+}
+
+/**
  * Resolve the API base URL with the following precedence:
  *   1. `EXPO_PUBLIC_API_BASE_URL` — inlined at build time. Unlike
  *      `extra.apiBaseUrl`, which lives in the committed `app.json` and is
@@ -18,10 +27,15 @@ import {
  *      value (`/api/v1`) so a web bundle served by the backend itself talks
  *      to it same-origin — no CORS, and no tunnel interstitial on XHR.
  *   2. `expoConfig.extra.apiBaseUrl` — explicit override per environment.
- *   3. On web, derive from the current `window.location` so the app talks
+ *   3. On web served by backend (same origin), use relative path.
+ *   4. On web (dev), derive from the current `window.location` so the app talks
  *      to a backend on the same host (works in LAN / tunnel previews).
- *   4. Android emulator → `10.0.2.2` (loopback to the dev machine).
- *   5. Everything else (iOS simulator, web SSR, tests) → `localhost`.
+ *   5. Expo Go / dev-client on a physical device: use Metro's `hostUri`
+ *      (e.g. `"192.168.0.10:8081"`), which is the dev machine's LAN IP.
+ *      Reusing it means the phone talks to the backend on the same host
+ *      as the bundler — zero per-device config.
+ *   6. Android emulator → `10.0.2.2` (loopback to the dev machine).
+ *   7. Everything else (iOS simulator, web SSR, tests) → `localhost`.
  */
 function resolveBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -30,8 +44,23 @@ function resolveBaseUrl(): string {
   const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
   if (fromExtra) return fromExtra;
 
+  // Se o app web está sendo servido pelo backend (mesma origem), usa path relativo
+  if (isSameOriginWeb()) {
+    return API_PATH_PREFIX;
+  }
+
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     return `${window.location.protocol}//${window.location.hostname}:${DEFAULT_DEV_BACKEND_PORT}${API_PATH_PREFIX}`;
+  }
+
+  const hostUri =
+    Constants.expoConfig?.hostUri ??
+    (Constants as unknown as { expoGoConfig?: { debuggerHost?: string } }).expoGoConfig?.debuggerHost;
+  if (typeof hostUri === 'string' && hostUri.length > 0) {
+    const lanHost = hostUri.split(':')[0];
+    if (lanHost && lanHost !== 'localhost' && lanHost !== '127.0.0.1') {
+      return `http://${lanHost}:${DEFAULT_DEV_BACKEND_PORT}${API_PATH_PREFIX}`;
+    }
   }
 
   const host = Platform.OS === 'android' ? ANDROID_EMULATOR_LOOPBACK_HOST : 'localhost';
@@ -80,7 +109,8 @@ async function refreshAccessToken(): Promise<string | null> {
   const refresh = await tokenStore.getRefresh();
   if (!refresh) return null;
   try {
-    const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken: refresh });
+    // Usa a instância `api` para respeitar timeout, interceptors e baseURL corretos
+    const res = await api.post('/auth/refresh', { refreshToken: refresh });
     const { accessToken, refreshToken } = res.data;
     await tokenStore.set(accessToken, refreshToken);
     return accessToken;
@@ -98,9 +128,18 @@ api.interceptors.response.use(
     if (!shouldRetry) return Promise.reject(error);
 
     original._retried = true;
-    refreshing = refreshing ?? refreshAccessToken();
+    // Single-flight real: antes a `refreshing` era zerada logo depois do await do
+    // primeiro cliente, então uma segunda 401 concorrente via `refreshing` como null
+    // e disparava um segundo POST /auth/refresh — quebrando o propósito do latch.
+    // O `.finally` garante que todas as 401s que entrarem enquanto o refresh está
+    // em voo latchem na MESMA promise; só quando ela resolve é que `refreshing`
+    // volta a null, deixando futuras 401s dispararem um refresh novo.
+    if (!refreshing) {
+      refreshing = refreshAccessToken().finally(() => {
+        refreshing = null;
+      });
+    }
     const newToken = await refreshing;
-    refreshing = null;
 
     if (!newToken) return Promise.reject(error);
 

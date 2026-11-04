@@ -26,9 +26,19 @@ let running = false;
  * no meio devolve o lote intacto para o próximo tick. Publicar dentro da transação
  * troca "possível perda" por "possível duplicata", e duplicata o consumidor deduplica.
  */
+const OUTBOX_WARN_THRESHOLD = 1000;
+
 async function tick(): Promise<void> {
   const channel = await getPublishChannel();
-  if (!channel) return; // Broker fora: eventos ficam represados; tentamos no próximo tick.
+  if (!channel) {
+    // Broker fora: eventos ficam represados; tentamos no próximo tick.
+    // Loga tamanho do outbox se estiver acumulando.
+    const pending = await prisma.outboxEvent.count({ where: { publishedAt: null } });
+    if (pending > OUTBOX_WARN_THRESHOLD) {
+      logger.warn({ pending }, `Outbox represado: ${pending} eventos pendentes (broker indisponível)`);
+    }
+    return;
+  }
 
   await prisma.$transaction(
     async (tx) => {

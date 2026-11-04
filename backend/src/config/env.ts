@@ -71,22 +71,41 @@ const schema = z.object({
   JOBS_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
   // Um booking REQUESTED sem resposta por este tempo é expirado por um job.
   BOOKING_EXPIRY_HOURS: z.coerce.number().int().positive().default(48),
+  // Retenção de dados. DELETE-side effect: ligado por env, nunca por default.
+  // Prerequisito operacional: backup diário validado. Prazos:
+  //   OUTBOX: 30d (histórico de eventos já publicados — raro ter que olhar passado)
+  //   PROCESSED_EVENT: 7d (janela típica de retry de webhook do Asaas)
+  //   AUDIT_LOG: 365d (auditoria legal/financeira; produto/legal podem exigir mais)
+  RETENTION_CLEANUP_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  RETENTION_OUTBOX_DAYS: z.coerce.number().int().positive().default(30),
+  RETENTION_PROCESSED_EVENT_DAYS: z.coerce.number().int().positive().default(7),
+  RETENTION_AUDIT_LOG_DAYS: z.coerce.number().int().positive().default(365),
   // Bull Board (UI das filas) em /admin/queues. Basic auth em vez de Bearer porque a UI
   // faz polling no navegador — o browser reenvia a credencial Basic a cada request, um
-  // header Bearer não. Defaults só de DEV; sobrescreva em qualquer ambiente exposto.
-  ADMIN_UI_USER: z.string().default('admin'),
-  ADMIN_UI_PASSWORD: z.string().default('zelo-admin'),
-  // Asaas (gateway de pagamento). Dependência OPCIONAL: com ASAAS_ENABLED=false o fluxo de
-  // pagamento usa o PIX mock (dev/demo sem conta no gateway). Ligado, gera cobrança PIX
-  // real e confirma pelo webhook do Asaas. Base URL default é o SANDBOX de propósito.
+  // header Bearer não. OBRIGATÓRIO em produção — sem defaults por segurança.
+  ADMIN_UI_USER: z.string().min(1, 'ADMIN_UI_USER é obrigatório'),
+  ADMIN_UI_PASSWORD: z.string().min(1, 'ADMIN_UI_PASSWORD é obrigatório'),
+  // Asaas (gateway de pagamento). Dependência OPCIONAL: com ASAAS_ENABLED=false, PIX fica
+  // indisponível e o cliente pode escolher dinheiro. Ligado, gera cobrança PIX real e
+  // confirma pelo webhook do Asaas. Base URL default é o SANDBOX de propósito.
   ASAAS_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   ASAAS_BASE_URL: z.string().url().default('https://sandbox.asaas.com/api/v3'),
   ASAAS_API_KEY: z.string().optional(),
   // Token que o Asaas envia no header `asaas-access-token` do webhook; valida a origem.
-  ASAAS_WEBHOOK_TOKEN: z.string().optional(),
+  ASAAS_WEBHOOK_TOKEN: z.string().min(16).optional(),
   ASAAS_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
   // Comissão da plataforma (%) retida na liquidação do escrow.
   PLATFORM_FEE_PERCENT: z.coerce.number().min(0).max(50).default(12),
+  // Habilita o endpoint admin de confirmação manual de pagamento. Fora da lista
+  // "operar normalmente": só é ligado em cenários específicos (sandbox que não
+  // simula PIX, reconciliação de suporte quando webhook falhou). Desligado por
+  // padrão em QUALQUER ambiente — tem que ser ligado explicitamente.
+  ALLOW_ADMIN_FORCE_CONFIRM: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  // Sentry para erros remotos. Sem SENTRY_DSN, o módulo é no-op — nenhum overhead
+  // em dev/test, zero chance de vazar erro de dev para o projeto de produção.
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
 }).superRefine((cfg, ctx) => {
   // Um serviço de ranking aberto sem token receberia userId e coordenadas de
   // qualquer um. Se a integração está ligada e apontada para algum lugar, o
@@ -99,14 +118,78 @@ const schema = z.object({
     });
   }
 
-  // Asaas ligado sem chave de API não faz sentido — falha no boot em vez de degradar
-  // silenciosamente para o mock quando a intenção era cobrar de verdade.
+  // Asaas ligado sem chave de API não faz sentido — falha no boot em vez de aceitar
+  // configuração que nunca conseguiria cobrar de verdade.
   if (cfg.ASAAS_ENABLED && !cfg.ASAAS_API_KEY) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['ASAAS_API_KEY'],
       message: 'ASAAS_API_KEY é obrigatória quando ASAAS_ENABLED=true',
     });
+  }
+
+if (cfg.ASAAS_ENABLED && !cfg.ASAAS_WEBHOOK_TOKEN) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['ASAAS_WEBHOOK_TOKEN'],
+      message: 'ASAAS_WEBHOOK_TOKEN é obrigatório quando ASAAS_ENABLED=true',
+    });
+  }
+
+  if (cfg.NODE_ENV === 'production' && cfg.ASAAS_WEBHOOK_TOKEN && cfg.ASAAS_WEBHOOK_TOKEN.length < 32) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['ASAAS_WEBHOOK_TOKEN'],
+      message: 'ASAAS_WEBHOOK_TOKEN deve ter pelo menos 32 chars em produção',
+    });
+  }
+
+  // Guarda contra os defaults de desenvolvimento versionados no docker-compose.yml.
+  // Esses valores existem só para `docker compose up` funcionar sem configuração;
+  // em produção qualquer um deles indica que o operador esqueceu de sobrescrever
+  // e o sistema subiria com secrets conhecidos — qualquer um forjaria tokens.
+  // Preferimos travar o boot do que servir com credencial exposta no git.
+  if (cfg.NODE_ENV === 'production') {
+    const forbiddenPatterns = ['dev_only_', 'troque_isto', 'zelo_admin_1234'];
+    const secretFields: Array<[keyof typeof cfg, string | undefined]> = [
+      ['JWT_ACCESS_SECRET', cfg.JWT_ACCESS_SECRET],
+      ['JWT_REFRESH_SECRET', cfg.JWT_REFRESH_SECRET],
+      ['ML_SERVICE_TOKEN', cfg.ML_SERVICE_TOKEN],
+      ['NOTIFICATIONS_SERVICE_TOKEN', cfg.NOTIFICATIONS_SERVICE_TOKEN],
+      ['ASAAS_WEBHOOK_TOKEN', cfg.ASAAS_WEBHOOK_TOKEN],
+      ['ASAAS_API_KEY', cfg.ASAAS_API_KEY],
+      ['ADMIN_UI_PASSWORD', cfg.ADMIN_UI_PASSWORD],
+    ];
+    for (const [field, value] of secretFields) {
+      if (!value) continue;
+      const hit = forbiddenPatterns.find((p) => value.includes(p));
+      if (hit) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field as string],
+          message: `${String(field)} contém marcador de desenvolvimento ("${hit}"). Em produção, gere um valor forte com \`openssl rand -base64 48\`.`,
+        });
+      }
+    }
+
+    // JWTs iguais entre si quebram a separação access/refresh: um token roubado pode
+    // ser aceito pelo outro verificador. Travar o boot quando o operador define os dois
+    // iguais é mais seguro que confiar que ninguém vai fazer isso.
+    if (cfg.JWT_ACCESS_SECRET && cfg.JWT_REFRESH_SECRET && cfg.JWT_ACCESS_SECRET === cfg.JWT_REFRESH_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['JWT_REFRESH_SECRET'],
+        message: 'JWT_REFRESH_SECRET deve ser diferente de JWT_ACCESS_SECRET',
+      });
+    }
+
+    if (cfg.ADMIN_UI_PASSWORD && cfg.ADMIN_UI_PASSWORD.length < 16) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ADMIN_UI_PASSWORD'],
+        message: 'ADMIN_UI_PASSWORD deve ter pelo menos 16 chars em produção',
+      });
+    }
   }
 
   // Mesma razão do ML: uma API interna sem token aceitaria consultas de inbox de
@@ -144,8 +227,22 @@ const schema = z.object({
 const parsed = schema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error('Configuração de ambiente inválida:');
-  console.error(parsed.error.flatten().fieldErrors);
+  const fieldErrors = parsed.error.flatten().fieldErrors;
+  const missingRequired = Object.entries(fieldErrors)
+    .filter(([, errors]) => errors.some(e => e.includes('Required') || e.includes('obrigatório')))
+    .map(([field]) => field);
+
+  console.error('❌ Configuração de ambiente inválida:');
+  if (missingRequired.length > 0) {
+    console.error(`   Variáveis OBRIGATÓRIAS ausentes: ${missingRequired.join(', ')}`);
+    console.error('   Copie .env.example para .env e preencha os valores.');
+  }
+  console.error('   Detalhes:');
+  for (const [field, errors] of Object.entries(fieldErrors)) {
+    for (const err of errors) {
+      console.error(`     - ${field}: ${err}`);
+    }
+  }
   process.exit(1);
 }
 

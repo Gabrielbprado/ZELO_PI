@@ -53,6 +53,7 @@ export const bookingCreateSchema = {
     urgency: z.enum(['EMERGENCY', 'TODAY', 'THIS_WEEK', 'FLEXIBLE']).default('FLEXIBLE'),
     priceEstimate: z.number().int().min(0).max(MAX_PRICE).optional(),
     durationMinutes: z.number().int().min(15).max(480).optional(),
+    needsOnSiteQuote: z.boolean().optional(),
     // Origem de recomendação: o requestId do card que levou a este booking. Opcional,
     // e sem `.uuid()` de propósito — o id do carrossel não é um UUID.
     requestId: z.string().trim().min(1).max(64).optional(),
@@ -63,6 +64,13 @@ export const bookingUpdateStatus = {
   body: z.object({
     status: z.enum(['ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
     priceFinal: z.number().int().min(0).max(MAX_PRICE).optional(),
+  }),
+  params: uuidParam,
+};
+
+export const bookingUpdatePrice = {
+  body: z.object({
+    priceFinal: z.number().int().min(1).max(MAX_PRICE),
   }),
   params: uuidParam,
 };

@@ -15,6 +15,7 @@ interface AuthState {
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   setUser: (u: User) => void;
 }
 
@@ -33,6 +34,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const me = await authApi.me();
     setUser(me);
     void registerForPush();
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const access = await tokenStore.getAccess();
+    if (!access) return;
+    const me = await authApi.me();
+    setUser(me);
   }, []);
 
   useEffect(() => {
@@ -71,9 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refresh,
+      refreshUser,
       setUser,
     }),
-    [user, loading, login, register, logout, refresh],
+    [user, loading, login, register, logout, refresh, refreshUser],
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

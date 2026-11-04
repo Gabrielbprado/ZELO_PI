@@ -24,6 +24,24 @@ export const logger = pino({
       'passwordHash',
       'token',
       'refreshToken',
+      // Coordenadas de rastreamento — nunca devem aparecer em log, mesmo por acidente
+      // (ex.: alguém loga `req.body` de `POST /travel/location`). O Pino segue dot-path
+      // e wildcard para profundidade arbitrária.
+      'latitude',
+      'longitude',
+      'lat',
+      'lng',
+      '*.latitude',
+      '*.longitude',
+      '*.lat',
+      '*.lng',
+      // PII financeira/documental que também não deve chegar aos logs.
+      'cpf',
+      'cpfCnpj',
+      'card.number',
+      'card.ccv',
+      '*.cpf',
+      '*.cpfCnpj',
     ],
     censor: '[REDACTED]',
   },

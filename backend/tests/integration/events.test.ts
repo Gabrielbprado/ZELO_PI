@@ -105,10 +105,11 @@ describe('outbox transacional (sem broker)', () => {
     });
     await updateBookingStatus(booking.id, provider.userId, 'PROVIDER', 'COMPLETED', 200);
     await prisma.payment.create({
-      data: { bookingId: booking.id, amount: 200, method: 'pix', status: 'PENDING' },
+      data: { bookingId: booking.id, amount: 200, method: 'cash', status: 'PENDING' },
     });
 
-    await confirmPayment(client.id, booking.id);
+    // Confirmação manual é EXCLUSIVA para dinheiro — provider dono do agendamento.
+    await confirmPayment(provider.userId, 'PROVIDER', booking.id);
 
     const rows = await outbox(ROUTING_KEYS.PAYMENT_CONFIRMED);
     expect(rows).toHaveLength(1);

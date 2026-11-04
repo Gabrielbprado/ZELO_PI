@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, Home, Navigation } from 'lucide-react-native';
+import { Home, Navigation } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import {
   joinTracking,
@@ -103,12 +104,7 @@ export default function TrackingScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 8 }}>
-        <Pressable onPress={() => nav.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Voltar">
-          <ArrowLeft size={24} color={c.text} />
-        </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>Acompanhar deslocamento</Text>
-      </View>
+      <PageHeader title="Deslocamento" subtitle="Acompanhe em tempo real" onBack={() => nav.goBack()} />
 
       <View style={{ paddingHorizontal: 16 }}>
         {error ? (

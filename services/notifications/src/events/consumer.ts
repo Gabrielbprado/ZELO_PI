@@ -31,28 +31,40 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 /**
- * Persiste a notificação e dispara o push. O `id` da linha É o id do evento: uma entrega
- * duplicada colide na PK (P2002) e é tratada como duplicata — idempotência sem tabela
- * auxiliar. O push vem DEPOIS do commit, best-effort: falhar o push não desfaz o inbox,
- * e uma duplicata (que nem chega a inserir) também não re-empurra.
+ * Persiste cada entrada de inbox derivada do evento e dispara o push. O id da linha É
+ * derivado do id do evento (`${eventId}` ou `${eventId}:${suffix}` para eventos multi-
+ * destinatário como `payment.confirmed`): uma entrega duplicada colide na PK (P2002) e é
+ * tratada como duplicata, sem tabela auxiliar. Cada entrada é persistida na sua própria
+ * chamada — uma duplicata isolada NÃO impede que a irmã (outro destinatário) seja
+ * gravada, garantindo que o cliente e o profissional recebam ambos, ainda que o broker
+ * reentregue o mesmo evento no meio do processamento.
  */
 async function persistAndPush(event: DomainEvent): Promise<void> {
-  const entry = toInbox(event);
-  if (!entry) return;
+  const entries = toInbox(event);
+  if (entries.length === 0) return;
 
-  await prisma.notification.create({
-    data: {
-      id: event.id,
-      userId: entry.userId,
-      type: entry.type,
-      title: entry.title,
-      body: entry.body,
-      data: entry.data as unknown as Prisma.InputJsonValue,
-    },
-  });
-  notificationsPersisted.inc();
-
-  await pushToUser(entry.userId, { title: entry.title, body: entry.body, data: entry.data });
+  for (const entry of entries) {
+    const id = entry.suffix ? `${event.id}:${entry.suffix}` : event.id;
+    try {
+      await prisma.notification.create({
+        data: {
+          id,
+          userId: entry.userId,
+          type: entry.type,
+          title: entry.title,
+          body: entry.body,
+          data: entry.data as unknown as Prisma.InputJsonValue,
+        },
+      });
+      notificationsPersisted.inc();
+      // Push best-effort e por-destinatário: falha do push de A não impede persistir/push
+      // de B, e uma duplicata (que nem chega a inserir) também não re-empurra.
+      await pushToUser(entry.userId, { title: entry.title, body: entry.body, data: entry.data });
+    } catch (err) {
+      if (isUniqueViolation(err)) continue; // já persistido em entrega anterior
+      throw err;
+    }
+  }
 }
 
 /** Sincroniza a réplica local de tokens. Upsert/delete são idempotentes por natureza. */
@@ -77,8 +89,7 @@ async function processMessage(ch: Channel, msg: ConsumeMessage): Promise<void> {
 
   if (!schema || !eventId) {
     logger.warn({ routingKey }, 'evento sem contrato/id; para a DLQ');
-    deadLetter(ch, msg);
-    ch.ack(msg);
+    settleDeadLetter(ch, msg);
     return;
   }
 
@@ -86,20 +97,31 @@ async function processMessage(ch: Channel, msg: ConsumeMessage): Promise<void> {
   try {
     payload = JSON.parse(msg.content.toString());
   } catch {
-    deadLetter(ch, msg);
-    ch.ack(msg);
+    settleDeadLetter(ch, msg);
     return;
   }
 
   const parsed = schema.safeParse(payload);
   if (!parsed.success) {
     logger.warn({ routingKey, issues: parsed.error.issues }, 'payload fora do contrato; para a DLQ');
-    deadLetter(ch, msg);
-    ch.ack(msg);
+    settleDeadLetter(ch, msg);
     return;
   }
 
   const event = { id: eventId, routingKey, payload: parsed.data } as DomainEvent;
+
+  // Validação adicional estrita para payment.confirmed: amount finito e > 0.
+  // Um NaN passava pela guarda antiga (NaN > 0 e NaN <= 0 são ambos false) e
+  // chegava no mapper como "R$ NaN" na notificação ao cliente.
+  if (routingKey === ROUTING_KEYS.PAYMENT_CONFIRMED) {
+    const p = event.payload as { amount?: number };
+    if (typeof p.amount !== 'number' || !Number.isFinite(p.amount) || p.amount <= 0) {
+      logger.warn({ eventId }, 'payment.confirmed: amount inválido, para DLQ');
+      settleDeadLetter(ch, msg);
+      return;
+    }
+  }
+
   const header = msg.properties.headers?.['x-request-id'];
   const requestId = typeof header === 'string' ? header : undefined;
 
@@ -148,12 +170,43 @@ function scheduleRetry(ch: Channel, msg: ConsumeMessage, err: unknown): void {
   ch.ack(msg);
 }
 
-function deadLetter(ch: Channel, msg: ConsumeMessage): void {
-  ch.sendToQueue(QUEUE_DLQ, msg.content, {
-    persistent: true,
-    headers: msg.properties.headers,
-    messageId: msg.properties.messageId,
-  });
+function deadLetter(ch: Channel, msg: ConsumeMessage): boolean {
+  try {
+    ch.sendToQueue(QUEUE_DLQ, msg.content, {
+      persistent: true,
+      headers: msg.properties.headers,
+      messageId: msg.properties.messageId,
+    });
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err: (err as Error).message, messageId: msg.properties.messageId },
+      'DLQ: falha ao publicar; nack com requeue para o broker reentregar',
+    );
+    return false;
+  }
+}
+
+/**
+ * Resolve uma mensagem rumo à DLQ com a semântica correta: só faz ack se o publish
+ * na DLQ não lançou. Se o canal cair no meio, nack+requeue e o broker reentrega —
+ * antes a mensagem era perdida porque o ack ia sempre depois do sendToQueue sem
+ * nenhuma verificação.
+ */
+function settleDeadLetter(ch: Channel, msg: ConsumeMessage): void {
+  if (deadLetter(ch, msg)) {
+    try {
+      ch.ack(msg);
+    } catch {
+      /* canal já caiu — o broker vai reentregar na próxima conexão */
+    }
+  } else {
+    try {
+      ch.nack(msg, false, true);
+    } catch {
+      /* canal caiu antes do nack, o broker reentrega quando reabrir */
+    }
+  }
 }
 
 async function subscribe(): Promise<void> {

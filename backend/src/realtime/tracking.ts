@@ -1,121 +1,183 @@
 import type { Server as IOServer, Socket } from 'socket.io';
-import { prisma } from '../config/prisma';
-import { getRedis } from '../config/redis';
 import { logger } from '../utils/logger';
+import {
+  recordLocation,
+  getCurrentLocation,
+  type TravelLocationInput,
+} from '../services/bookingTravel.service';
+import { prisma } from '../config/prisma';
+import { BookingTravelStatus } from '@prisma/client';
 
 /**
- * Rastreamento de deslocamento em tempo real.
+ * Rastreamento em tempo real (socket). O fluxo é:
  *
- * Quando o profissional inicia o deslocamento até o cliente, ele emite a própria posição
- * a cada poucos segundos; o servidor valida que quem emite é MESMO o profissional daquele
- * booking e retransmite para a sala do booking — o cliente vê o ponto se aproximando ao
- * vivo. A última posição fica no Redis (efêmera) para que um cliente que abre a tela
- * depois já receba de imediato onde o profissional está.
+ *   1) Prestador chama `POST /bookings/:id/travel/start` (REST). Backend cria
+ *      `BookingTravel` ACTIVE e publica `travel.started` no outbox.
+ *   2) Prestador e cliente entram na sala via `travel:join`. O handler confere no DB
+ *      que a sessão está ACTIVE e autoriza. Tipo é cacheado no socket.
+ *   3) Prestador emite `travel:location:update` a cada ~3s. Handler delega para
+ *      `recordLocation`, que valida sessão+authz, escreve no Redis e retransmite
+ *      para a sala. Se a sessão não estiver mais ativa, descarta silenciosamente
+ *      — cliente malicioso não aprende que o bypass foi barrado.
+ *   4) Prestador chama `POST /bookings/:id/travel/arrived` (ou `/cancel`).
+ *      Backend encerra a sessão e emite `travel:ended` para a sala — AMBOS os lados
+ *      limpam o estado local e desligam o GPS.
  *
- * Segurança: a autorização é resolvida UMA vez no join (uma query), cacheada no socket, e
- * cada `location:update` só é aceito de quem entrou como `provider` daquele booking — sem
- * bater no banco a cada ping.
+ * Observe o que esta camada NÃO faz: não decide encerrar, não valida dono do booking,
+ * não publica no outbox. Isso tudo é responsabilidade do service.
  */
-export const TRACKING_EVENTS = {
-  JOIN: 'tracking:join',
-  LEAVE: 'tracking:leave',
-  LOCATION_UPDATE: 'location:update',
-  LOCATION_PROVIDER: 'location:provider',
+
+export const TRAVEL_EVENTS = {
+  JOIN: 'travel:join',
+  LEAVE: 'travel:leave',
+  LOCATION_UPDATE: 'travel:location:update',
+  // Broadcast para o cliente (mesmo nome, direção oposta — o socket distingue
+  // por quem envia; o guard em `recordLocation` garante que só o provider ativo
+  // pode emitir).
+  STARTED: 'travel:started',
+  ENDED: 'travel:ended',
 } as const;
 
-const LAST_LOCATION_TTL_SEC = 600;
+// Janela mínima entre dois updates aceitos do mesmo socket+booking. O mobile emite
+// a cada 3-5s; qualquer frequência acima disto é cliente malcomportado ou atacante.
+const LOCATION_UPDATE_MIN_INTERVAL_MS = 1000;
+
 type Role = 'client' | 'provider';
 
-interface LocationPayload {
-  bookingId: string;
-  lat: number;
-  lng: number;
-}
+interface JoinPayload { bookingId?: string }
+interface LeavePayload { bookingId?: string }
+interface UpdatePayload extends Partial<TravelLocationInput> { bookingId?: string }
 
 function bookingRoom(bookingId: string): string {
   return `booking:${bookingId}`;
 }
 
-function isValidCoord(lat: unknown, lng: unknown): boolean {
-  return (
-    typeof lat === 'number' && typeof lng === 'number' &&
-    lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
-  );
-}
-
-async function resolveRole(userId: string, bookingId: string): Promise<Role | null> {
+/**
+ * Resolve o papel do usuário no booking E confere que existe uma sessão ACTIVE.
+ * Mantém a autorização em uma só query — não batemos no banco por update.
+ */
+async function resolveActiveRole(userId: string, bookingId: string): Promise<Role | null> {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { provider: { select: { userId: true } } },
+    select: {
+      clientId: true,
+      provider: { select: { userId: true } },
+      travel: { select: { status: true } },
+    },
   });
   if (!booking) return null;
+  if (!booking.travel || booking.travel.status !== BookingTravelStatus.ACTIVE) return null;
   if (booking.clientId === userId) return 'client';
   if (booking.provider.userId === userId) return 'provider';
   return null;
 }
 
-async function readLastLocation(bookingId: string): Promise<(LocationPayload & { at: string }) | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-  try {
-    const raw = await redis.get(`track:${bookingId}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function writeLastLocation(payload: LocationPayload & { at: string }): Promise<void> {
-  const redis = getRedis();
-  if (!redis) return;
-  try {
-    await redis.set(`track:${payload.bookingId}`, JSON.stringify(payload), 'EX', LAST_LOCATION_TTL_SEC);
-  } catch {
-    // Best-effort: sem Redis, o relay ao vivo continua funcionando, só não há "última posição".
-  }
-}
-
 export function registerTracking(io: IOServer, socket: Socket): void {
   const userId = socket.data.userId as string;
-  // bookingId → papel do usuário naquele booking, resolvido no join.
+
+  // Estado por socket, sem precisar de Redis:
+  //   roles:       bookingId → papel no booking (cacheado no JOIN).
+  //   isActive:    bookingId → sessão está ACTIVE agora? (zerado em `travel:ended`).
+  //   lastUpdate:  bookingId → timestamp do último update aceito (anti-flood).
   const roles = new Map<string, Role>();
+  const isActive = new Map<string, boolean>();
+  const lastUpdate = new Map<string, number>();
   socket.data.trackingRoles = roles;
 
-  socket.on(TRACKING_EVENTS.JOIN, async (raw: { bookingId?: string }, ack?: (r: unknown) => void) => {
+  socket.on(TRAVEL_EVENTS.JOIN, async (raw: JoinPayload, ack?: (r: unknown) => void) => {
     const bookingId = raw?.bookingId;
     if (typeof bookingId !== 'string') return ack?.({ ok: false, error: 'bookingId inválido' });
 
-    const role = await resolveRole(userId, bookingId);
-    if (!role) return ack?.({ ok: false, error: 'sem acesso a este booking' });
+    const role = await resolveActiveRole(userId, bookingId);
+    if (!role) return ack?.({ ok: false, error: 'sem acesso ou sessão inativa' });
 
     roles.set(bookingId, role);
+    isActive.set(bookingId, true);
     await socket.join(bookingRoom(bookingId));
 
-    // Quem entra recebe a última posição conhecida, se houver.
-    const last = await readLastLocation(bookingId);
-    if (last) socket.emit(TRACKING_EVENTS.LOCATION_PROVIDER, last);
+    // Quem entra recebe a última posição conhecida, se houver (via service, que já
+    // respeita status da sessão e authz).
+    try {
+      const last = await getCurrentLocation(userId, bookingId);
+      if (last) socket.emit(TRAVEL_EVENTS.LOCATION_UPDATE, last);
+    } catch {
+      /* se falhou em ler, o cliente ainda assim entra — próximo update preenche */
+    }
     ack?.({ ok: true, role });
   });
 
-  socket.on(TRACKING_EVENTS.LOCATION_UPDATE, async (raw: LocationPayload) => {
+  socket.on(TRAVEL_EVENTS.LOCATION_UPDATE, async (raw: UpdatePayload) => {
     const bookingId = raw?.bookingId;
-    // Só o PROFISSIONAL daquele booking pode emitir posição, e só se já entrou na sala.
+    // Só o PROVIDER com sessão ACTIVE conhecida localmente pode emitir.
     if (typeof bookingId !== 'string' || roles.get(bookingId) !== 'provider') return;
-    if (!isValidCoord(raw.lat, raw.lng)) return;
+    if (!isActive.get(bookingId)) return;
 
-    const payload = { bookingId, lat: raw.lat, lng: raw.lng, at: new Date().toISOString() };
-    // Retransmite para a sala, exceto para o próprio emissor.
-    socket.to(bookingRoom(bookingId)).emit(TRACKING_EVENTS.LOCATION_PROVIDER, payload);
-    await writeLastLocation(payload);
+    // Throttle — descarta silenciosamente. Já defendido com guard no service também.
+    const now = Date.now();
+    const prev = lastUpdate.get(bookingId);
+    if (prev !== undefined && now - prev < LOCATION_UPDATE_MIN_INTERVAL_MS) return;
+    lastUpdate.set(bookingId, now);
+
+    const lat = raw.latitude;
+    const lng = raw.longitude;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return;
+
+    const result = await recordLocation(userId, bookingId, {
+      latitude: lat,
+      longitude: lng,
+      accuracy: raw.accuracy ?? null,
+      heading: raw.heading ?? null,
+      speed: raw.speed ?? null,
+      recordedAt: raw.recordedAt ?? new Date().toISOString(),
+    });
+
+    if (!result.accepted) {
+      // Sessão encerrada entre o JOIN e o update: zera o flag local para parar de
+      // tentar. O cliente malicioso não é notificado — serviço continua silencioso.
+      if (result.reason === 'inactive') isActive.set(bookingId, false);
+      return;
+    }
+
+    // Retransmite para a sala. NÃO logamos nem armazenamos em outro lugar.
+    const payload = {
+      bookingId,
+      latitude: lat,
+      longitude: lng,
+      accuracy: raw.accuracy ?? null,
+      heading: raw.heading ?? null,
+      speed: raw.speed ?? null,
+      recordedAt: raw.recordedAt ?? new Date().toISOString(),
+    };
+    socket.to(bookingRoom(bookingId)).emit(TRAVEL_EVENTS.LOCATION_UPDATE, payload);
   });
 
-  socket.on(TRACKING_EVENTS.LEAVE, (raw: { bookingId?: string }) => {
+  socket.on(TRAVEL_EVENTS.LEAVE, (raw: LeavePayload) => {
     const bookingId = raw?.bookingId;
     if (typeof bookingId !== 'string') return;
     roles.delete(bookingId);
+    isActive.delete(bookingId);
+    lastUpdate.delete(bookingId);
     void socket.leave(bookingRoom(bookingId));
   });
 
-  void io; // reservado para broadcasts futuros a partir do servidor
-  logger.debug({ userId }, 'tracking: handlers registrados');
+  void io;
+  logger.debug({ userId }, 'travel: handlers registrados');
+}
+
+/**
+ * Broadcasts externos (chamados pelo listener do outbox quando `travel.started/ended`
+ * é consumido). Mantidos aqui para que o módulo seja o único lugar que conhece o
+ * canal `booking:<id>` e os nomes dos eventos.
+ */
+export function broadcastTravelStarted(io: IOServer, bookingId: string, startedAt: string): void {
+  io.to(bookingRoom(bookingId)).emit(TRAVEL_EVENTS.STARTED, { bookingId, startedAt });
+}
+
+export function broadcastTravelEnded(
+  io: IOServer,
+  bookingId: string,
+  reason: 'arrived' | 'cancelled' | 'timeout',
+  endedAt: string,
+): void {
+  io.to(bookingRoom(bookingId)).emit(TRAVEL_EVENTS.ENDED, { bookingId, reason, endedAt });
 }

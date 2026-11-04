@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Clock, Check, X } from 'lucide-react-native';
+import { Clock, Check, X } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import * as kycApi from '../api/kyc';
@@ -60,12 +61,7 @@ export default function KycScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}>
-        <Pressable onPress={() => nav.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Voltar">
-          <ArrowLeft size={24} color={c.text} />
-        </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>Verificação (KYC)</Text>
-      </View>
+      <PageHeader title="Verificação de identidade" onBack={() => nav.goBack()} />
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         <Text style={{ color: c.textSec, fontSize: 13 }}>

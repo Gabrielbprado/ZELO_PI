@@ -47,6 +47,9 @@ export async function truncateAll() {
     prisma.review.deleteMany(),
     prisma.message.deleteMany(),
     prisma.payment.deleteMany(),
+    // BookingTravel tem FK Restrict para Booking (migração 20261104130000): precisa
+    // ser apagada ANTES de Booking, senão o deleteMany dispara FK violation.
+    prisma.bookingTravel.deleteMany(),
     prisma.booking.deleteMany(),
     prisma.providerAvailability.deleteMany(),
     prisma.providerTimeOff.deleteMany(),

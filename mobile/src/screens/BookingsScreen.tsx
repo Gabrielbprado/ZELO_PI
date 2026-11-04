@@ -11,6 +11,7 @@ import { Avatar } from '../components/Avatar';
 import { Badge } from '../components/Badge';
 import { useAuth } from '../contexts/AuthContext';
 import * as bookingsApi from '../api/bookings';
+import { formatReais } from '../utils/money';
 import type { Booking, BookingStatus } from '../types';
 import type { AppStackParamList } from '../navigation/types';
 
@@ -56,9 +57,9 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
-        <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '800' }}>Minha agenda</Text>
-        <Text style={{ color: theme.colors.textSec, fontSize: 13, marginTop: 4 }}>
+      <View style={{ paddingHorizontal: theme.spacing.s5, paddingTop: 8, paddingBottom: 12 }}>
+        <Text style={{ color: theme.colors.text, ...theme.type.largeTitle }}>Agenda</Text>
+        <Text style={{ color: theme.colors.textSec, fontSize: 13, marginTop: 2 }}>
           {user?.role === 'PROVIDER' ? 'Solicitações recebidas' : 'Seus serviços contratados'}
         </Text>
       </View>
@@ -84,32 +85,47 @@ export default function BookingsScreen() {
               user?.role === 'PROVIDER'
                 ? item.client
                 : item.provider?.user;
+            const isClient = user?.role === 'CLIENT';
+            // Cliente com booking concluído e pagamento ainda não fechado precisa de um
+            // empurrão visual — destaque o card e coloque um badge "Pagamento pendente".
+            const owesPayment =
+              isClient &&
+              item.status === 'COMPLETED' &&
+              (item.payment == null || item.payment.status !== 'PAID');
             return (
               <Pressable
                 onPress={() => nav.navigate('BookingDetail', { bookingId: item.id })}
                 style={({ pressed }) => ({
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: theme.radius.lg,
+                  backgroundColor: owesPayment ? theme.colors.warnBg : theme.colors.surface,
+                  borderRadius: theme.radius.md,
                   padding: 14,
-                  borderWidth: 1,
-                  borderColor: theme.colors.hairline,
+                  borderWidth: owesPayment ? 1.5 : 1,
+                  borderColor: owesPayment ? theme.colors.warnBorder : theme.colors.hairline,
                   flexDirection: 'row',
                   gap: 12,
                   alignItems: 'center',
-                  transform: [{ scale: pressed ? 0.99 : 1 }],
+                  opacity: pressed ? 0.7 : 1,
                 })}
               >
                 <Avatar name={other?.name ?? '?'} size={44} hue={other?.avatarHue ?? 220} />
                 <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={{ color: theme.colors.text, fontSize: 14, fontWeight: '700' }}>{item.title}</Text>
+                  <Text numberOfLines={1} style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600', letterSpacing: -0.2 }}>{item.title}</Text>
                   <Text numberOfLines={1} style={{ color: theme.colors.textSec, fontSize: 12, marginTop: 2 }}>
                     {other?.name ?? '—'} · {item.address}
                   </Text>
-                  <Text style={{ color: theme.colors.textTer, fontSize: 11, marginTop: 4 }}>
-                    {new Date(item.createdAt).toLocaleDateString('pt-BR')}
-                  </Text>
+                  {owesPayment ? (
+                    <Text style={{ color: theme.colors.warn, fontSize: 12, fontWeight: '800', marginTop: 4 }}>
+                      Pagamento pendente{item.priceFinal != null ? ` · ${formatReais(item.priceFinal)}` : ''}
+                    </Text>
+                  ) : (
+                    <Text style={{ color: theme.colors.textTer, fontSize: 11, marginTop: 4 }}>
+                      {new Date(item.createdAt).toLocaleDateString('pt-BR')}
+                    </Text>
+                  )}
                 </View>
-                <Badge tone={statusTone[item.status]}>{statusLabel[item.status]}</Badge>
+                <Badge tone={owesPayment ? 'warn' : statusTone[item.status]}>
+                  {owesPayment ? 'Pagamento pendente' : statusLabel[item.status]}
+                </Badge>
               </Pressable>
             );
           }}

@@ -20,11 +20,22 @@
 
 ## Sumário
 
+- [Sumário](#sumário)
 - [O que é](#o-que-é)
 - [Telas](#telas)
 - [Arquitetura](#arquitetura)
-- [Rodar com Docker](#rodar-com-docker) ← **caminho mais curto**
+- [Rodar com Docker (recomendado)](#rodar-com-docker-recomendado)
+  - [1. Instale o Docker](#1-instale-o-docker)
+  - [2. Baixe o projeto e suba](#2-baixe-o-projeto-e-suba)
+  - [O que fica disponível](#o-que-fica-disponível)
+  - [Extras opcionais](#extras-opcionais)
 - [Rodar sem Docker](#rodar-sem-docker)
+  - [Pré-requisitos](#pré-requisitos)
+  - [1. Banco de dados (PostgreSQL + PostGIS)](#1-banco-de-dados-postgresql--postgis)
+  - [2. Backend (API)](#2-backend-api)
+  - [3. App mobile](#3-app-mobile)
+  - [4. Serviço de ML (opcional)](#4-serviço-de-ml-opcional)
+  - [Rodando tudo (3 terminais)](#rodando-tudo-3-terminais)
 - [Cache e resiliência (Redis)](#cache-e-resiliência-redis)
 - [Testes](#testes)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
@@ -32,6 +43,8 @@
 - [API](#api)
 - [CI/CD e deploy](#cicd-e-deploy)
 - [Documentação](#documentação)
+- [Contribuindo](#contribuindo)
+- [Licença](#licença)
 
 ---
 
@@ -49,7 +62,8 @@ diarista, pintor…) com um fluxo transparente de ponta a ponta:
   avaliado *de fato* mais próximo, usando distância real (PostGIS).
 - 💬 **Chat 1:1** em tempo real (WebSocket) dentro de um agendamento.
 - 🔔 **Notificações push** (Expo) para eventos do agendamento.
-- 💳 **Pagamento** via PIX ou cartão (gateway simulado).
+- 💳 **Pagamento** via PIX ou cartão, **processado exclusivamente pelo gateway
+  Asaas** (único gateway suportado — ver [`docs/PAYMENTS.md`](docs/PAYMENTS.md)).
 - ⭐ **Avaliação** ao final, alimentando a nota de confiança do profissional.
 
 Entregue como um **monorepo** com três aplicações independentes: API em

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
-import { ArrowLeft, Check } from 'lucide-react-native';
+import { ChevronLeft, Check } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AxiosError } from 'axios';
@@ -68,8 +68,14 @@ export default function RegisterScreen() {
   return (
     <ScreenContainer scroll contentStyle={{ paddingHorizontal: 20, paddingBottom: 48 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable onPress={() => nav.goBack()} style={{ width: 40, height: 40, marginTop: 8 }}>
-          <ArrowLeft color={theme.colors.text} size={22} />
+        <Pressable
+          onPress={() => nav.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+          hitSlop={8}
+          style={({ pressed }) => ({ width: 44, height: 44, marginTop: 8, marginLeft: -12, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.4 : 1 })}
+        >
+          <ChevronLeft color={theme.colors.primaryText} size={28} />
         </Pressable>
 
         <Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: '800', marginTop: 24 }}>

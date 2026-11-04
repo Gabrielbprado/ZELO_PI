@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { View, Text, Pressable, Switch, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ShieldCheck, Bell, MapPin, Lock, Moon, Sun, Smartphone } from 'lucide-react-native';
+import { ShieldCheck, Bell, MapPin, Lock, Moon, Sun, Smartphone } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
+import { Section } from '../components/Section';
+import { ListRow } from '../components/ListRow';
 import type { ThemePreference } from '../theme';
 import type { AppStackParamList } from '../navigation/types';
 
@@ -16,54 +19,44 @@ export default function SettingsScreen() {
   const [twoFa, setTwoFa] = useState(false);
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Pressable onPress={() => nav.goBack()} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.hairline }}>
-          <ArrowLeft color={theme.colors.text} size={18} />
-        </Pressable>
-        <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>Configurações</Text>
-      </View>
+    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+      <PageHeader title="Ajustes" onBack={() => nav.goBack()} />
 
-      <View style={{ paddingHorizontal: 20, gap: 12 }}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: theme.spacing.s5, gap: theme.spacing.s4, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
         <Section title="Aparência">
           <ThemePicker value={preference} onChange={setPreference} />
         </Section>
 
         <Section title="Notificações">
-          <ToggleRow icon={<Bell size={16} color={theme.colors.text} />} label="Receber notificações push" value={notif} onChange={setNotif} />
+          <ListRow icon={<Bell size={17} color={theme.colors.text} />} title="Notificações push" value={notif} onToggle={setNotif} />
         </Section>
 
         <Section title="Privacidade">
-          <ToggleRow icon={<MapPin size={16} color={theme.colors.text} />} label="Compartilhar localização aproximada" value={loc} onChange={setLoc} />
+          <ListRow icon={<MapPin size={17} color={theme.colors.text} />} title="Localização aproximada" subtitle="Usada para sugerir profissionais próximos" value={loc} onToggle={setLoc} />
         </Section>
 
         <Section title="Segurança">
-          <ToggleRow
-            icon={<Lock size={16} color={theme.colors.text} />}
-            label="Verificação em duas etapas"
+          <ListRow
+            icon={<Lock size={17} color={theme.colors.text} />}
+            title="Verificação em duas etapas"
             value={twoFa}
-            onChange={(v) => { setTwoFa(v); Alert.alert('Em breve', '2FA será habilitado no próximo update.'); }}
+            onToggle={(v) => { setTwoFa(v); Alert.alert('Em breve', '2FA será habilitado no próximo update.'); }}
+            divider
           />
-          <Pressable
+          <ListRow
+            icon={<ShieldCheck size={17} color={theme.colors.text} />}
+            title="Alterar senha"
             onPress={() => nav.navigate('ChangePassword')}
-            style={({ pressed }) => ({
-              flexDirection: 'row', alignItems: 'center', gap: 12,
-              paddingHorizontal: 14, paddingVertical: 14,
-              borderTopWidth: 1, borderTopColor: theme.colors.hairline,
-              backgroundColor: pressed ? theme.colors.surface2 : 'transparent',
-            })}
-          >
-            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: theme.colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-              <ShieldCheck size={16} color={theme.colors.text} />
-            </View>
-            <Text style={{ color: theme.colors.text, fontSize: 14, flex: 1 }}>Alterar senha</Text>
-          </Pressable>
+          />
         </Section>
 
-        <Text style={{ color: theme.colors.textTer, fontSize: 11, textAlign: 'center', marginTop: 12 }}>
-          ZERO Marketplace · v1.0.0
-        </Text>
-      </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 4 }}>
+          <Lock size={11} color={theme.colors.textTer} />
+          <Text style={{ color: theme.colors.textTer, fontSize: 12, textAlign: 'center' }}>
+            ZERO Marketplace · v1.0.0
+          </Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -81,7 +74,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: typeof Sun }
 function ThemePicker({ value, onChange }: { value: ThemePreference; onChange: (v: ThemePreference) => void }) {
   const { theme } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', padding: 8, gap: 8 }}>
+    <View style={{ flexDirection: 'row', padding: 10, gap: 8 }}>
       {THEME_OPTIONS.map(({ value: option, label, Icon }) => {
         const active = value === option;
         return (
@@ -98,43 +91,18 @@ function ThemePicker({ value, onChange }: { value: ThemePreference; onChange: (v
               paddingVertical: 12,
               borderRadius: theme.radius.md,
               backgroundColor: active ? theme.colors.primaryGlow : theme.colors.surface2,
-              borderWidth: 1.5,
+              borderWidth: 1,
               borderColor: active ? theme.colors.primary : 'transparent',
-              transform: [{ scale: pressed ? 0.98 : 1 }],
+              opacity: pressed ? 0.7 : 1,
             })}
           >
-            <Icon size={18} color={active ? theme.colors.primaryText : theme.colors.textSec} />
-            <Text style={{ color: active ? theme.colors.primaryText : theme.colors.textSec, fontSize: 12, fontWeight: active ? '700' : '500' }}>
+            <Icon size={20} color={active ? theme.colors.primaryText : theme.colors.textSec} />
+            <Text style={{ color: active ? theme.colors.primaryText : theme.colors.textSec, fontSize: 13, fontWeight: active ? '600' : '400' }}>
               {label}
             </Text>
           </Pressable>
         );
       })}
-    </View>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const { theme } = useTheme();
-  return (
-    <View>
-      <Text style={{ color: theme.colors.textSec, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, paddingHorizontal: 4 }}>{title}</Text>
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.hairline, overflow: 'hidden' }}>
-        {children}
-      </View>
-    </View>
-  );
-}
-
-function ToggleRow({ icon, label, value, onChange }: { icon: React.ReactNode; label: string; value: boolean; onChange: (v: boolean) => void }) {
-  const { theme } = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 }}>
-      <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: theme.colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-        {icon}
-      </View>
-      <Text style={{ color: theme.colors.text, fontSize: 14, flex: 1 }}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ false: theme.colors.surface2, true: theme.colors.primaryHi }} thumbColor={theme.colors.onPrimary} />
     </View>
   );
 }

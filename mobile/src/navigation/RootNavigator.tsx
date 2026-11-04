@@ -52,15 +52,18 @@ function TabsNavigator() {
     <Tabs.Navigator
       screenOptions={{
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.hairline,
-          height: 64,
-          paddingBottom: 8,
+          borderTopWidth: 1,
+          height: 56,
+          paddingTop: 6,
+          paddingBottom: 6,
         },
         tabBarActiveTintColor: theme.colors.primaryText,
         tabBarInactiveTintColor: theme.colors.textSec,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
       }}
     >
       <Tabs.Screen

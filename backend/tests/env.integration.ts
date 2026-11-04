@@ -15,6 +15,10 @@ process.env.RATE_LIMIT_MAX = '10000';
 process.env.AUTH_RATE_LIMIT_MAX = '10000';
 process.env.CORS_ORIGINS = 'http://localhost:8081,http://example.test';
 
+// Admin UI credenciais para testes (sem defaults em produção)
+process.env.ADMIN_UI_USER = 'test-admin';
+process.env.ADMIN_UI_PASSWORD = 'test-admin-password';
+
 // Recomendação: a integração fica LIGADA e apontada para um host inexistente.
 // `env` é congelado no import, então definir isto em runtime dentro de um teste
 // não teria efeito — precisa estar aqui. Os testes controlam o comportamento
@@ -26,6 +30,9 @@ process.env.ML_SERVICE_TOKEN = 'token_de_teste_com_16_chars';
 process.env.ML_TIMEOUT_MS = '200';
 process.env.ML_MODERATION_TIMEOUT_MS = '200';
 
-// Asaas fica DESLIGADO na integração (createPayment usa o PIX mock, sem chamar a rede),
-// mas o token de webhook é definido para o teste do webhook exercitar a validação.
-process.env.ASAAS_WEBHOOK_TOKEN = 'test-webhook-token';
+// Asaas para testes de integração (mockado via global.fetch nos testes)
+process.env.ASAAS_ENABLED = 'true';
+process.env.ASAAS_BASE_URL = 'http://asaas.invalido.test/api/v3';
+process.env.ASAAS_API_KEY = 'TEST_ASAAS_API_KEY';
+process.env.ASAAS_WEBHOOK_TOKEN = 'test-asaas-webhook-token-32-chars-min';
+process.env.ASAAS_TIMEOUT_MS = '200';

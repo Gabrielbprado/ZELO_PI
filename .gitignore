@@ -142,3 +142,10 @@ skills-lock.json
 
 # Captura solta gerada em sessão local (as oficiais ficam em docs/screenshots/)
 /zelo-welcome.png
+
+# ──────────────────────────────────────────────────────────────
+# Dumps/backups locais (gerados por scripts/backup-postgres.sh)
+# ──────────────────────────────────────────────────────────────
+backups/
+*.dump
+*.dump.sha256

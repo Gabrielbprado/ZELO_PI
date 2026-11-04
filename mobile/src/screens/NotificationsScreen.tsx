@@ -2,8 +2,9 @@ import { useCallback, useState } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Bell, Check } from 'lucide-react-native';
+import { Bell, Check } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
 import * as notificationsApi from '../api/notifications';
 import type { Notification } from '../types';
 
@@ -30,15 +31,15 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Pressable onPress={() => nav.goBack()} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-          <ArrowLeft color={theme.colors.text} size={18} />
-        </Pressable>
-        <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700', flex: 1 }}>Notificações</Text>
-        <Pressable onPress={markAll}>
-          <Text style={{ color: theme.colors.primaryText, fontSize: 13, fontWeight: '600' }}>Marcar tudo</Text>
-        </Pressable>
-      </View>
+      <PageHeader
+        title="Notificações"
+        onBack={() => nav.goBack()}
+        right={
+          <Pressable onPress={markAll} hitSlop={8} style={{ minHeight: theme.hit, justifyContent: 'center', paddingHorizontal: 8 }}>
+            <Text style={{ color: theme.colors.primaryText, fontSize: 15, fontWeight: '600' }}>Marcar tudo</Text>
+          </Pressable>
+        }
+      />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View>

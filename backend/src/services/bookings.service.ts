@@ -19,6 +19,7 @@ export interface CreateBookingInput {
   urgency: Urgency;
   priceEstimate?: number;
   durationMinutes?: number;
+  needsOnSiteQuote?: boolean;
   // Presente quando o booking nasceu de um card de recomendação. Viaja no evento
   // `booking.created` e reabastece o sinal de conversão do recomendador.
   requestId?: string;
@@ -48,6 +49,9 @@ const BOOKING_INCLUDE_FULL = {
   client: { select: { id: true, name: true, avatarHue: true } },
   category: true,
   reviews: { select: { id: true, authorId: true, targetId: true, rating: true, comment: true } },
+  // Trazido junto para o cliente saber se um booking COMPLETED ainda precisa de pagamento —
+  // permite badge "Falta pagar" na lista sem N+1.
+  payment: { select: { id: true, status: true, method: true, amount: true } },
 } as const;
 
 export async function createBooking(input: CreateBookingInput) {
@@ -85,6 +89,7 @@ export async function createBooking(input: CreateBookingInput) {
         durationMinutes: duration,
         urgency: input.urgency,
         priceEstimate: input.priceEstimate,
+        needsOnSiteQuote: input.needsOnSiteQuote ?? false,
       },
     });
 
@@ -151,12 +156,15 @@ export async function updateBookingStatus(
 ) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { provider: true },
+    include: { provider: true, payment: { select: { id: true, status: true } } },
   });
   if (!booking) throw new NotFoundError('Agendamento não encontrado');
 
   assertBookingAccess(userId, role, booking.clientId, booking.provider.userId);
   assertTransitionAllowed(role, status);
+  if (typeof priceFinal === 'number') {
+    assertNoActivePaymentBeforePriceChange(booking.payment);
+  }
 
   const completedAt = status === 'COMPLETED' ? new Date() : booking.completedAt;
 
@@ -195,6 +203,36 @@ export async function updateBookingStatus(
   return updated;
 }
 
+/**
+ * Edita apenas o priceFinal do booking. Somente o profissional dono do agendamento pode
+ * mexer — o valor é o que ele vai cobrar. Não emite evento de transição (o status não muda);
+ * evita notificar o cliente como se fosse um novo booking.accepted/completed. O cliente
+ * enxerga o novo valor na próxima leitura do detalhe.
+ */
+export async function updateBookingPrice(
+  bookingId: string,
+  userId: string,
+  role: Role,
+  priceFinal: number,
+) {
+  if (role !== 'PROVIDER' && role !== 'ADMIN') {
+    throw new ForbiddenError('Apenas o profissional pode alterar o valor');
+  }
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { provider: true, payment: { select: { id: true, status: true } } },
+  });
+  if (!booking) throw new NotFoundError('Agendamento não encontrado');
+  if (role === 'PROVIDER' && booking.provider.userId !== userId) {
+    throw new ForbiddenError('Acesso negado');
+  }
+  if (booking.status === 'CANCELLED') {
+    throw new BadRequestError('Não é possível alterar o valor de um agendamento cancelado');
+  }
+  assertNoActivePaymentBeforePriceChange(booking.payment);
+  return prisma.booking.update({ where: { id: bookingId }, data: { priceFinal } });
+}
+
 export async function getBookingById(id: string, userId: string, role: Role) {
   const booking = await prisma.booking.findUnique({
     where: { id },
@@ -223,5 +261,11 @@ function assertTransitionAllowed(role: Role, status: AllowedBookingStatus): void
   const allowed = ALLOWED_STATUS_BY_ROLE[role] ?? [];
   if (!allowed.includes(status as BookingStatus)) {
     throw new ForbiddenError('Você não pode aplicar essa transição');
+  }
+}
+
+function assertNoActivePaymentBeforePriceChange(payment: { id: string; status: string } | null): void {
+  if (payment && ['PENDING', 'AUTHORIZED', 'PAID'].includes(payment.status)) {
+    throw new BadRequestError('Não é possível alterar o valor depois que há pagamento ativo');
   }
 }

@@ -13,8 +13,14 @@ interface Props {
   textStyle?: TextStyle;
 }
 
+/**
+ * Botão padrão — métricas iOS: 50pt de altura, raio 12, rótulo 17 semibold.
+ * O feedback é só opacidade (o iOS não "encolhe" o botão no toque).
+ * Usa `disabled` prop nativo do Pressable (RN 0.71+) para bloquear interação durante loading.
+ */
 export function Button({ onPress, children, variant = 'primary', loading, disabled, icon, style, textStyle }: Props) {
   const { theme } = useTheme();
+  const isDisabled = disabled || loading;
   const colors = {
     primary:   { bg: theme.colors.text,     fg: theme.colors.bg,   borderColor: 'transparent' },
     secondary: { bg: 'transparent',         fg: theme.colors.text, borderColor: theme.colors.hairline2 },
@@ -24,20 +30,23 @@ export function Button({ onPress, children, variant = 'primary', loading, disabl
 
   return (
     <Pressable
-      onPress={loading || disabled ? undefined : onPress}
+      onPress={onPress}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}
       style={({ pressed }) => [
         {
-          height: 54,
-          borderRadius: 14,
+          minHeight: 50,
+          borderRadius: theme.radius.md,
           backgroundColor: colors.bg,
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'row',
-          gap: 10,
-          opacity: disabled ? 0.45 : pressed ? 0.9 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-          paddingHorizontal: 24,
-          borderWidth: variant === 'secondary' ? 1.5 : 0,
+          gap: 8,
+          opacity: isDisabled ? 0.4 : pressed ? 0.75 : 1,
+          paddingHorizontal: 20,
+          paddingVertical: 13,
+          borderWidth: variant === 'secondary' ? 1 : 0,
           borderColor: colors.borderColor,
         },
         style,
@@ -48,7 +57,7 @@ export function Button({ onPress, children, variant = 'primary', loading, disabl
       ) : (
         <>
           {icon && <View>{icon}</View>}
-          <Text style={[{ color: colors.fg, fontSize: 15, fontWeight: '600', letterSpacing: -0.2 }, textStyle]}>
+          <Text style={[{ color: colors.fg, fontSize: 17, fontWeight: '600', letterSpacing: -0.2, textAlign: 'center' }, textStyle]}>
             {children}
           </Text>
         </>
