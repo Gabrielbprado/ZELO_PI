@@ -20,11 +20,23 @@
 
 ## Sumário
 
+- [Sumário](#sumário)
 - [O que é](#o-que-é)
+- [Status do projeto](#status-do-projeto)
 - [Telas](#telas)
 - [Arquitetura](#arquitetura)
-- [Rodar com Docker](#rodar-com-docker) ← **caminho mais curto**
+- [Rodar com Docker (recomendado)](#rodar-com-docker-recomendado)
+  - [1. Instale o Docker](#1-instale-o-docker)
+  - [2. Baixe o projeto e suba](#2-baixe-o-projeto-e-suba)
+  - [O que fica disponível](#o-que-fica-disponível)
+  - [Extras opcionais](#extras-opcionais)
 - [Rodar sem Docker](#rodar-sem-docker)
+  - [Pré-requisitos](#pré-requisitos)
+  - [1. Banco de dados (PostgreSQL + PostGIS)](#1-banco-de-dados-postgresql--postgis)
+  - [2. Backend (API)](#2-backend-api)
+  - [3. App mobile](#3-app-mobile)
+  - [4. Serviço de ML (opcional)](#4-serviço-de-ml-opcional)
+  - [Rodando tudo (3 terminais)](#rodando-tudo-3-terminais)
 - [Cache e resiliência (Redis)](#cache-e-resiliência-redis)
 - [Testes](#testes)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
@@ -32,6 +44,8 @@
 - [API](#api)
 - [CI/CD e deploy](#cicd-e-deploy)
 - [Documentação](#documentação)
+- [Contribuindo](#contribuindo)
+- [Licença](#licença)
 
 ---
 
@@ -49,11 +63,43 @@ diarista, pintor…) com um fluxo transparente de ponta a ponta:
   avaliado *de fato* mais próximo, usando distância real (PostGIS).
 - 💬 **Chat 1:1** em tempo real (WebSocket) dentro de um agendamento.
 - 🔔 **Notificações push** (Expo) para eventos do agendamento.
-- 💳 **Pagamento** via PIX ou cartão (gateway simulado).
+- 💳 **Pagamento** via PIX ou cartão, **processado exclusivamente pelo gateway
+  Asaas** (único gateway suportado — ver [`docs/PAYMENTS.md`](docs/PAYMENTS.md)).
 - ⭐ **Avaliação** ao final, alimentando a nota de confiança do profissional.
 
 Entregue como um **monorepo** com três aplicações independentes: API em
 TypeScript, app React Native e serviço de recomendação em Python.
+
+### Decisões arquiteturais que você precisa saber antes de mexer
+
+- **Gateway de pagamento: Asaas (exclusivo).** PIX, cartão, confirmação, estorno, split e
+  webhook passam **todos** por Asaas. Nenhum outro gateway é suportado. Detalhes:
+  [`docs/PAYMENTS.md`](./docs/PAYMENTS.md).
+- **Dados financeiros não cascateiam.** `Payment` e `Review` têm `ON DELETE RESTRICT` para
+  `Booking` — admin não apaga receita nem reputação por acidente.
+- **GPS do deslocamento não persiste trajetória.** O `BookingTravel` guarda só o ciclo de
+  vida (`ACTIVE/ARRIVED/CANCELLED` + timestamps); coordenadas vivem **somente** no Redis
+  com TTL curto e são apagadas no encerramento. Nunca em log, Sentry, outbox ou banco.
+- **Degradação nomeada em toda dependência opcional.** Redis, RabbitMQ, ML e Notificações
+  fora do ar não derrubam a API — viram comportamento documentado.
+- **Secrets de produção não podem ter marcador de desenvolvimento.** `env.ts` recusa o
+  boot com `NODE_ENV=production` se qualquer secret contiver `dev_only_` ou `troque_isto`.
+
+---
+
+## Status do projeto
+
+| Área | Estado |
+|---|---|
+| Backend — funcionalidade de produto | ✅ consolidado (auth, booking, chat, emergency, recomendação, pagamentos Asaas, moderação, financeiro) |
+| Backend — **GPS/Travel (Etapa 2)** | ✅ **implementado e testado**: `BookingTravel` + Redis efêmero + REST `/bookings/:id/travel/*` + Socket.IO `travel:*` + consumer outbox + jobs retry/timeout. Ver [`docs/plans/ETAPA_3_MOBILE_GPS.md`](./docs/plans/ETAPA_3_MOBILE_GPS.md) para o escopo mobile |
+| Mobile — funcionalidade de produto | ✅ consolidado (todos os fluxos exceto GPS em background) |
+| Mobile — **GPS/Travel (Etapa 3)** | ⏳ **planejado**: `react-native-maps` + `expo-location` + background service. Plano detalhado em [`docs/plans/ETAPA_3_MOBILE_GPS.md`](./docs/plans/ETAPA_3_MOBILE_GPS.md) |
+| Observabilidade | ⚙️ scaffolding (Sentry gated por `SENTRY_DSN`; Prometheus+Grafana via profile `obs`) |
+| Backup Postgres automatizado | ⏳ script pronto em `scripts/backup-postgres.sh` — agendamento depende de credencial externa ([runbook](./docs/runbooks/BACKUP_RESTORE.md)) |
+| Retenção de eventos/auditoria | ⚙️ job implementado, **desligado por default** (`RETENTION_CLEANUP_ENABLED=false`) |
+
+Histórico detalhado de auditorias, correções e riscos remanescentes em **[`PROJECT_AUDIT.md`](./PROJECT_AUDIT.md)**. Priorização e próximos passos em **[`ROADMAP_TECNICO.md`](./ROADMAP_TECNICO.md)**.
 
 ---
 
@@ -404,7 +450,14 @@ cd ml
 
 ## Variáveis de ambiente
 
-O `backend/.env.example` é a referência completa. As essenciais:
+Dois templates convivem com propósitos distintos:
+
+- **`.env.example`** (raiz) — referência completa; é consumido pelo `docker-compose.yml`
+  (`env_file: .env`) e serve de guia canônico ao operador.
+- **`backend/.env.example`** — subset enxuto para quem roda só o backend nativo
+  (`cd backend && npm run dev`) sem Docker.
+
+Essenciais (sem elas o backend recusa subir):
 
 | Variável | Obrigatória | Padrão | Descrição |
 |---|---|---|---|
@@ -423,9 +476,18 @@ O `backend/.env.example` é a referência completa. As essenciais:
 | `REDIS_ENABLED` | não | `false` | `true` liga cache, rate limit distribuído e breaker compartilhado |
 | `REDIS_URL` | condicional | — | obrigatória quando `REDIS_ENABLED=true` |
 | `REDIS_KEY_PREFIX` | não | `zelo` | isola ambientes que dividem a mesma instância |
+| `RABBITMQ_ENABLED` | não | `false` | `true` liga o barramento de eventos; sem ele o outbox fica represado até o broker voltar |
+| `RABBITMQ_URL` | condicional | — | obrigatória quando `RABBITMQ_ENABLED=true` |
+| `ASAAS_ENABLED` | não | `false` | **único gateway suportado** — PIX e cartão só funcionam com `true` + chave válida |
+| `ASAAS_API_KEY` | condicional | — | obrigatória quando `ASAAS_ENABLED=true`. Use chave sandbox em dev (`aact_YTU5…`); produção exige `aact_prod_…` |
+| `ASAAS_WEBHOOK_TOKEN` | condicional | — | ≥ 32 chars em produção; validado por `timingSafeEqual` no handler do webhook |
+| `ADMIN_UI_USER` / `ADMIN_UI_PASSWORD` | sim | — | credenciais do Bull Board em `/admin/queues`. Em produção, `env.ts` recusa secrets com marcador `dev_only_`, `troque_isto` ou senha < 16 chars |
+| `RETENTION_CLEANUP_ENABLED` | não | `false` | liga o job diário que apaga OutboxEvent/ProcessedEvent/AuditLog expirados — **só ligue depois de backup validado** |
+| `SENTRY_DSN` | não | — | ativa captura remota de erros; sem DSN o módulo é no-op e nenhum request vaza para fora |
 
-Detalhes de rate limit, bcrypt e das variáveis do serviço Python:
-[`docs/SETUP.md`](./docs/SETUP.md#6-variáveis-de-ambiente).
+Lista completa em `.env.example` (raiz). Detalhes operacionais em
+[`docs/SETUP.md`](./docs/SETUP.md#6-variáveis-de-ambiente) e
+[`docs/runbooks/`](./docs/runbooks/).
 
 ---
 
@@ -461,9 +523,25 @@ ZELO_PI/
 │   ├── contracts/          # JSON Schema do contrato Node ↔ Python
 │   └── tests/
 │
-├── docs/                   # SETUP · ML · SECURITY · DEPLOYMENT · BRANCHING
-│                           # brand/ (logo, ícones) · screenshots/
+├── services/notifications/ # Microserviço de notificações (Node + Prisma schema notifications)
+│
+├── docs/
+│   ├── SETUP.md · DOCKER.md · ML.md · SECURITY.md · DEPLOYMENT.md
+│   ├── PAYMENTS.md         # Asaas exclusivo — contratos, fluxos, degradação
+│   ├── ARCHITECTURE.md · MODERATION.md · BRANCHING.md
+│   ├── adr/                # Architecture Decision Records
+│   ├── audits/             # relatórios de auditoria técnica e critérios PASS/FAIL
+│   ├── plans/              # planos ativos (ex.: Etapa 3 mobile GPS)
+│   ├── proposals/          # decisões pendentes (CPF em repouso, timeout de 8h)
+│   ├── runbooks/           # operacional: backup/restore, migration guiada, webhook diag
+│   ├── brand/              # logo, paleta, tipografia
+│   └── screenshots/        # capturas oficiais do app
+│
+├── scripts/                # backup-postgres.sh, restore-postgres.sh (operacional)
+├── figma/                  # protótipo visual exportado
 ├── .github/workflows/      # CI, SonarCloud, deploys, retreino do modelo
+├── PROJECT_AUDIT.md        # histórico vivo de auditorias e riscos remanescentes
+├── ROADMAP_TECNICO.md      # pendências priorizadas (P0/P1/P2/P3)
 └── render.yaml             # blueprint de infraestrutura
 ```
 
@@ -502,11 +580,18 @@ Base: `/api/v1`. Autenticação por `Authorization: Bearer <access token>`.
 | `GET` | `/notifications` | bearer | Notificações |
 | `POST` | `/notifications/read-all` · `/notifications/:id/read` | bearer | Marca como lida |
 | `POST` | `/emergency/match` | cliente | Casa um profissional para o SOS |
-| `POST` | `/payments` · `/payments/:bookingId/confirm` | cliente | Pagamento do agendamento |
-| `GET` | `/health` | público | Health check |
+| `POST` | `/payments` · `/payments/:bookingId/confirm` | cliente | Pagamento do agendamento (Asaas) |
+| `GET` | `/payments/installments` | público | Opções de parcelamento (cálculo em centavos) |
+| `POST` | `/payments/webhook/asaas` | gateway | Webhook do Asaas (header `asaas-access-token`, idempotente via `ProcessedEvent`). Troubleshooting: [`docs/runbooks/WEBHOOK_ASAAS_DIAGNOSTIC.md`](./docs/runbooks/WEBHOOK_ASAAS_DIAGNOSTIC.md) |
+| `POST` | `/bookings/:id/travel/start` | prestador | Inicia sessão de deslocamento (`ACTIVE`) |
+| `POST` | `/bookings/:id/travel/location` | prestador | Fallback REST para GPS em background (quando o socket cai) |
+| `POST` | `/bookings/:id/travel/arrived` · `/cancel` | prestador | Encerra sessão — apaga Redis + emite `travel.ended` |
+| `GET` | `/bookings/:id/travel/location` | cliente/prestador | Última posição (410 Gone se encerrada) |
+| `GET` | `/health` · `/health/ready` | público | Liveness (sempre 200 se vivo) · Readiness (503 só se Postgres cair) |
 
 Tempo real: `socket.io` em `/realtime`, autenticado pelo mesmo access token
-(`auth.token` no handshake).
+(`auth.token` no handshake). Eventos de GPS: `travel:join` / `travel:location:update` /
+`travel:started` / `travel:ended`. Chat: `message:new`.
 
 Erros seguem sempre o mesmo envelope:
 
@@ -516,6 +601,8 @@ Erros seguem sempre o mesmo envelope:
 
 Códigos: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`,
 `PAYLOAD_TOO_LARGE`, `TOO_MANY_REQUESTS`, `VALIDATION_ERROR`, `INTERNAL_ERROR`.
+Status específicos: `410 Gone` para recurso encerrado (ex.: sessão de travel após
+arrived/cancel); `503 Service Unavailable` quando Redis está fora e a leitura depende dele.
 
 ---
 
@@ -535,17 +622,46 @@ Segredos, blueprint e vínculo dos projetos: [`docs/DEPLOYMENT.md`](./docs/DEPLO
 
 ## Documentação
 
+### Começo e referência
+
 | Documento | Conteúdo |
 |---|---|
 | [`docs/SETUP.md`](./docs/SETUP.md) | Instalação detalhada por sistema operacional, testes, troubleshooting |
 | [`docs/DOCKER.md`](./docs/DOCKER.md) | Ambiente completo em contêineres: seed automático, perfis de ML, treino |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Diagramas C4, fluxo de `payment.confirmed`, topologia AMQP |
+| [`docs/PAYMENTS.md`](./docs/PAYMENTS.md) | **Asaas (gateway exclusivo)** — contratos, fluxos, degradação |
 | [`docs/ML.md`](./docs/ML.md) | Model card: dados, features, avaliação, limites e riscos do recomendador |
-| [`docs/MODERATION.md`](./docs/MODERATION.md) | Denúncias, classificação automática, guarda-corpos do bloqueio pela IA e decisão do admin |
+| [`docs/MODERATION.md`](./docs/MODERATION.md) | Denúncias, classificação automática, guarda-corpos do bloqueio pela IA |
 | [`docs/SECURITY.md`](./docs/SECURITY.md) | Checklist de segurança do backend |
 | [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) | Deploy em Render e Vercel: secrets, blueprint e vínculo dos projetos |
 | [`docs/BRANCHING.md`](./docs/BRANCHING.md) | Estratégia de branches e regras de proteção |
+| [`docs/adr/`](./docs/adr/README.md) | Architecture Decision Records |
 | [`docs/brand/BRAND-KIT.md`](./docs/brand/BRAND-KIT.md) | Logo, paleta, tipografia e ícones |
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Commits convencionais, fluxo de review |
+
+### Histórico vivo e planejamento
+
+| Documento | Conteúdo |
+|---|---|
+| [`PROJECT_AUDIT.md`](./PROJECT_AUDIT.md) | **Índice vivo** de auditorias, correções aplicadas e riscos remanescentes |
+| [`ROADMAP_TECNICO.md`](./ROADMAP_TECNICO.md) | Pendências priorizadas (P0/P1/P2/P3) e cronograma sugerido |
+
+### Runbooks operacionais (`docs/runbooks/`)
+
+| Documento | Quando usar |
+|---|---|
+| [`BACKUP_RESTORE.md`](./docs/runbooks/BACKUP_RESTORE.md) | Dump semanal do Postgres + restore validado em paralelo |
+| [`MIGRATE_BOOKING_TRAVEL.md`](./docs/runbooks/MIGRATE_BOOKING_TRAVEL.md) | Aplicar a migration `20261104130000` em staging |
+| [`WEBHOOK_ASAAS_DIAGNOSTIC.md`](./docs/runbooks/WEBHOOK_ASAAS_DIAGNOSTIC.md) | Diagnóstico de 401/404/405 no webhook Asaas Sandbox |
+
+### Decisões pendentes e planos ativos
+
+| Documento | Status |
+|---|---|
+| [`docs/plans/ETAPA_3_MOBILE_GPS.md`](./docs/plans/ETAPA_3_MOBILE_GPS.md) | Plano detalhado da integração mobile (`react-native-maps` + `expo-location`) — **aguardando autorização** |
+| [`docs/proposals/CPF_AT_REST_PROTECTION.md`](./docs/proposals/CPF_AT_REST_PROTECTION.md) | Hash vs encryption de CPF em repouso — **decisão de produto/legal** |
+| [`docs/proposals/TRAVEL_TIMEOUT_8H.md`](./docs/proposals/TRAVEL_TIMEOUT_8H.md) | Threshold de 8h do `travel-timeout-active` — **decisão de produto** |
+| [`docs/audits/`](./docs/audits/) | Critérios PASS/FAIL e relatórios de auditoria técnica |
 
 ---
 

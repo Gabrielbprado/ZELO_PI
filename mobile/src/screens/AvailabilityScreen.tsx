@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Minus, Plus } from 'lucide-react-native';
+import { Minus, Plus } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import * as availApi from '../api/availability';
 
@@ -86,12 +87,7 @@ export default function AvailabilityScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}>
-        <Pressable onPress={() => nav.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Voltar">
-          <ArrowLeft size={24} color={c.text} />
-        </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>Minha agenda</Text>
-      </View>
+      <PageHeader title="Disponibilidade" subtitle="Defina seus horários de atendimento" onBack={() => nav.goBack()} />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

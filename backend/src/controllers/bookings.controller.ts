@@ -2,6 +2,7 @@ import {
   createBooking,
   getBookingById,
   listUserBookings,
+  updateBookingPrice,
   updateBookingStatus,
 } from '../services/bookings.service';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -28,6 +29,16 @@ export const updateStatus = asyncHandler(async (req, res) => {
     req.user!.sub,
     req.user!.role,
     req.body.status,
+    req.body.priceFinal,
+  );
+  res.json(item);
+});
+
+export const updatePrice = asyncHandler(async (req, res) => {
+  const item = await updateBookingPrice(
+    req.params.id,
+    req.user!.sub,
+    req.user!.role,
     req.body.priceFinal,
   );
   res.json(item);

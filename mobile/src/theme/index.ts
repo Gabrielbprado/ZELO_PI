@@ -10,6 +10,29 @@ export const fontWeights = {
   extra:    '800' as const,
 };
 
+/**
+ * Escala tipográfica no espírito do Dynamic Type do iOS (San Francisco).
+ * Telas de raiz (abas) usam `largeTitle`; telas empurradas usam `navTitle`
+ * centralizado via PageHeader; corpo e listas usam `body` (17pt).
+ */
+export const type = {
+  largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: -0.5 },
+  title1:     { fontSize: 28, fontWeight: '700', letterSpacing: -0.4 },
+  title2:     { fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
+  title3:     { fontSize: 20, fontWeight: '600', letterSpacing: -0.3 },
+  navTitle:   { fontSize: 17, fontWeight: '600', letterSpacing: -0.2 },
+  headline:   { fontSize: 17, fontWeight: '600', letterSpacing: -0.2 },
+  body:       { fontSize: 17, fontWeight: '400', letterSpacing: 0 },
+  callout:    { fontSize: 16, fontWeight: '400', letterSpacing: 0 },
+  subhead:    { fontSize: 15, fontWeight: '400', letterSpacing: 0 },
+  footnote:   { fontSize: 13, fontWeight: '400', letterSpacing: 0 },
+  caption:    { fontSize: 12, fontWeight: '400', letterSpacing: 0 },
+  section:    { fontSize: 13, fontWeight: '600', letterSpacing: 0.4 },
+} as const;
+
+/** Alvo mínimo de toque (44pt, HIG). */
+export const hitTarget = 44;
+
 /** O que o tema efetivamente renderiza. */
 export type ThemeMode = 'light' | 'dark';
 
@@ -26,10 +49,12 @@ export interface Theme {
   radius: typeof radius;
   spacing: typeof spacing;
   fonts: typeof fontWeights;
+  type: typeof type;
+  hit: typeof hitTarget;
 }
 
-export const darkTheme: Theme  = { mode: 'dark',  colors: darkPalette,  radius, spacing, fonts: fontWeights };
-export const lightTheme: Theme = { mode: 'light', colors: lightPalette, radius, spacing, fonts: fontWeights };
+export const darkTheme: Theme  = { mode: 'dark',  colors: darkPalette,  radius, spacing, fonts: fontWeights, type, hit: hitTarget };
+export const lightTheme: Theme = { mode: 'light', colors: lightPalette, radius, spacing, fonts: fontWeights, type, hit: hitTarget };
 
 /** Tema padrão do produto. Telas devem usar `useTheme()` — este export é a âncora do default. */
 export const defaultTheme = lightTheme;

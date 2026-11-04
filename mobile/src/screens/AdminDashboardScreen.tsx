@@ -2,8 +2,9 @@ import { useCallback, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, TrendingUp, Users, ShieldCheck, Receipt, Percent, Wallet } from 'lucide-react-native';
+import { TrendingUp, Users, ShieldCheck, Receipt, Percent, Wallet } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageHeader } from '../components/PageHeader';
 import * as adminApi from '../api/admin';
 
 const brl = (reais: number) => reais.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -44,12 +45,7 @@ export default function AdminDashboardScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 }}>
-        <Pressable onPress={() => nav.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Voltar">
-          <ArrowLeft size={24} color={c.text} />
-        </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>Painel administrativo</Text>
-      </View>
+      <PageHeader title="Painel administrativo" onBack={() => nav.goBack()} />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={c.primary} /></View>
