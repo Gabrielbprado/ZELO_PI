@@ -17,7 +17,13 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O ZELO usa sua localização para compartilhar seu deslocamento com o cliente enquanto o serviço está a caminho."
+        }
+      ]
     ],
     "extra": {
       "eas": {

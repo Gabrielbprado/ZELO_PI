@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { Platform, View, Text } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Home, Navigation } from 'lucide-react-native';
+import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { PageHeader } from '../components/PageHeader';
 import { Button } from '../components/Button';
 import {
@@ -14,11 +16,11 @@ import {
   leaveTracking,
   type ProviderLocation,
 } from '../api/realtime';
+import * as travelApi from '../api/travel';
 import type { AppStackParamList } from '../navigation/types';
 
-/** Distância assumida do trajeto (m) — normaliza o progresso a partir do 1º ponto recebido. */
+/** Distância de referência usada apenas para desenhar o avanço no painel. */
 const ASSUMED_ROUTE_M = 3000;
-const AVG_SPEED_KMH = 28;
 const PANEL_H = 340;
 const MARKER = 44;
 
@@ -32,75 +34,169 @@ function distMeters(a: { lat: number; lng: number }, b: { lat: number; lng: numb
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
+function startErrorMessage(err: unknown): string {
+  const apiErr = err as { response?: { data?: { error?: { message?: string } } } };
+  return (
+    apiErr?.response?.data?.error?.message ??
+    (err instanceof Error ? err.message : 'Não foi possível iniciar o deslocamento. Tente novamente.')
+  );
+}
+
 export default function TrackingScreen() {
   const nav = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { params } = useRoute<RouteProp<AppStackParamList, 'Tracking'>>();
   const { theme } = useTheme();
+  const { user } = useAuth();
   const c = theme.colors;
+  const isProvider = user?.role === 'PROVIDER';
 
-  const [role, setRole] = useState<'client' | 'provider' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loc, setLoc] = useState<ProviderLocation | null>(null);
   const [start, setStart] = useState<ProviderLocation | null>(null);
   const [sharing, setSharing] = useState(false);
-  const shareTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'waiting' | 'active'>('idle');
+  const watchSub = useRef<Location.LocationSubscription | null>(null);
+
+  const stopWatch = useCallback(() => {
+    watchSub.current?.remove();
+    watchSub.current = null;
+  }, []);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
+    let retry: ReturnType<typeof setInterval> | null = null;
     let alive = true;
+
     (async () => {
-      const r = await joinTracking(params.bookingId);
-      if (!alive) return;
-      if (!r.ok) return setError(r.error ?? 'Não foi possível acompanhar este serviço.');
-      setRole(r.role ?? null);
       unsub = await onProviderLocation((l) => {
         if (l.bookingId !== params.bookingId) return;
         setLoc(l);
         setStart((prev) => prev ?? l);
       });
+
+      // O cliente pode abrir a tela antes do prestador iniciar a sessão. Nesse
+      // caso o join é recusado; tentamos de novo até a sessão ficar ACTIVE.
+      if (!isProvider) {
+        const tryJoin = async () => {
+          const r = await joinTracking(params.bookingId);
+          if (!alive || !r.ok) return;
+          if (retry) {
+            clearInterval(retry);
+            retry = null;
+          }
+        };
+        void tryJoin();
+        retry = setInterval(tryJoin, 5000);
+      }
     })();
+
     return () => {
       alive = false;
       unsub?.();
-      if (shareTimer.current) clearInterval(shareTimer.current);
+      if (retry) clearInterval(retry);
+      if (watchSub.current) {
+        stopWatch();
+        // Sair da tela encerra o compartilhamento para não deixar sessão ACTIVE órfã.
+        void travelApi.cancelTravel(params.bookingId).catch(() => undefined);
+      }
       void leaveTracking(params.bookingId);
     };
-  }, [params.bookingId]);
+  }, [params.bookingId, isProvider, stopWatch]);
 
   const traveled = loc && start ? distMeters(start, loc) : 0;
   const progress = Math.min(1, traveled / ASSUMED_ROUTE_M);
-  const remainingM = Math.max(0, ASSUMED_ROUTE_M - traveled);
-  const etaMin = Math.max(1, Math.round((remainingM / 1000 / AVG_SPEED_KMH) * 60));
-  const arrived = progress >= 0.98;
-
-  // Profissional: simula o deslocamento (funciona na web sem GPS nativo), interpolando de
-  // um ponto de partida até o destino e publicando a posição a cada passo.
-  const toggleShare = useCallback(() => {
-    if (sharing) {
-      if (shareTimer.current) clearInterval(shareTimer.current);
-      setSharing(false);
-      return;
-    }
-    setSharing(true);
-    const from = { lat: -23.5610, lng: -46.6560 };
-    const to = { lat: -23.5880, lng: -46.6430 };
-    const steps = 24;
-    let step = 0;
-    shareTimer.current = setInterval(() => {
-      step += 1;
-      const t = Math.min(1, step / steps);
-      const jitter = (t < 1 ? (Math.sin(step) * 0.0004) : 0);
-      const lat = from.lat + (to.lat - from.lat) * t + jitter;
-      const lng = from.lng + (to.lng - from.lng) * t + jitter;
-      void emitLocation(params.bookingId, lat, lng);
-      if (t >= 1 && shareTimer.current) {
-        clearInterval(shareTimer.current);
-        setSharing(false);
-      }
-    }, 1500);
-  }, [sharing, params.bookingId]);
-
+  const speedKmh = loc?.speed != null ? Math.max(0, loc.speed * 3.6) : null;
   const markerTop = (PANEL_H - MARKER - 16) * (1 - progress) + 8;
+
+  const stopSharing = useCallback(
+    async (reason: 'arrived' | 'cancelled') => {
+      setBusy(true);
+      stopWatch();
+      setSharing(false);
+      setGpsStatus('idle');
+      try {
+        if (reason === 'arrived') await travelApi.markArrived(params.bookingId);
+        else await travelApi.cancelTravel(params.bookingId);
+      } catch {
+        // Sessão já encerrada (410/409): estado local já está limpo.
+      } finally {
+        setBusy(false);
+      }
+      void leaveTracking(params.bookingId);
+    },
+    [params.bookingId, stopWatch],
+  );
+
+  // Profissional: abre a sessão no backend, pede permissão de GPS e passa a
+  // publicar a posição real do dispositivo via socket a cada atualização.
+  const toggleShare = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    let sessionOpened = false;
+
+    try {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && !window.isSecureContext) {
+        throw new Error(
+          'O navegador só libera a localização em HTTPS ou localhost. Abra o app em http://localhost:4000.',
+        );
+      }
+
+      await travelApi.startTravel(params.bookingId);
+      sessionOpened = true;
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        throw new Error(
+          'Permissão de localização negada. Autorize o acesso ao GPS para compartilhar o deslocamento.',
+        );
+      }
+
+      const joined = await joinTracking(params.bookingId);
+      if (!joined.ok) throw new Error('Não foi possível entrar na sala de rastreamento.');
+
+      setLoc(null);
+      setStart(null);
+      setSharing(true);
+      setGpsStatus('waiting');
+
+      watchSub.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 3000,
+          distanceInterval: 5,
+        },
+        (position) => {
+          const { latitude, longitude, accuracy, speed } = position.coords;
+          const point: ProviderLocation = {
+            bookingId: params.bookingId,
+            lat: latitude,
+            lng: longitude,
+            at: new Date(position.timestamp).toISOString(),
+            accuracy: accuracy ?? null,
+            speed: speed ?? null,
+          };
+          setLoc(point);
+          setStart((prev) => prev ?? point);
+          setGpsStatus('active');
+          void emitLocation(params.bookingId, latitude, longitude, accuracy, speed, point.at);
+        },
+      );
+    } catch (err) {
+      if (sessionOpened) {
+        try {
+          await travelApi.cancelTravel(params.bookingId);
+        } catch {
+          /* sessão já encerrada */
+        }
+      }
+      setSharing(false);
+      setGpsStatus('idle');
+      setError(startErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [params.bookingId]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
@@ -110,6 +206,11 @@ export default function TrackingScreen() {
         {error ? (
           <View style={{ backgroundColor: c.dangerBg, borderRadius: 12, padding: 16 }}>
             <Text style={{ color: c.danger, fontWeight: '600' }}>{error}</Text>
+            {isProvider ? (
+              <Button variant="secondary" onPress={toggleShare} style={{ marginTop: 12 }}>
+                Tentar novamente
+              </Button>
+            ) : null}
           </View>
         ) : (
           <>
@@ -133,42 +234,57 @@ export default function TrackingScreen() {
             {/* status */}
             <View style={{ marginTop: 16, flexDirection: 'row', justifyContent: 'space-between' }}>
               <View>
-                <Text style={{ color: c.textTer, fontSize: 12, fontWeight: '600' }}>DISTÂNCIA</Text>
+                <Text style={{ color: c.textTer, fontSize: 12, fontWeight: '600' }}>DISTÂNCIA PERCORRIDA</Text>
                 <Text style={{ color: c.text, fontSize: 20, fontWeight: '700' }}>
-                  {remainingM >= 1000 ? `${(remainingM / 1000).toFixed(1)} km` : `${Math.round(remainingM)} m`}
+                  {traveled >= 1000 ? `${(traveled / 1000).toFixed(2)} km` : `${Math.round(traveled)} m`}
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: c.textTer, fontSize: 12, fontWeight: '600' }}>CHEGADA EM</Text>
-                <Text style={{ color: c.text, fontSize: 20, fontWeight: '700' }}>{arrived ? 'chegou 🎉' : `~${etaMin} min`}</Text>
+                <Text style={{ color: c.textTer, fontSize: 12, fontWeight: '600' }}>VELOCIDADE</Text>
+                <Text style={{ color: c.text, fontSize: 20, fontWeight: '700' }}>
+                  {speedKmh != null ? `${speedKmh.toFixed(0)} km/h` : '—'}
+                </Text>
               </View>
             </View>
 
-            <View style={{ marginTop: 12, backgroundColor: arrived ? c.successBg : c.surface2, borderRadius: 12, padding: 14 }}>
-              <Text style={{ color: arrived ? c.success : c.textSec, fontWeight: '600' }}>
+            <View style={{ marginTop: 12, backgroundColor: c.surface2, borderRadius: 12, padding: 14 }}>
+              <Text style={{ color: c.textSec, fontWeight: '600' }}>
                 {!loc
-                  ? role === 'provider'
-                    ? 'Inicie o deslocamento para o cliente acompanhar você em tempo real.'
-                    : 'Aguardando o profissional iniciar o deslocamento…'
-                  : arrived
-                    ? 'O profissional chegou ao local.'
+                  ? sharing
+                    ? gpsStatus === 'waiting'
+                      ? 'Obtendo sua localização…'
+                      : 'Compartilhando sua localização…'
+                    : isProvider
+                      ? 'Inicie o deslocamento para o cliente acompanhar você em tempo real.'
+                      : 'Aguardando o profissional iniciar o deslocamento…'
+                  : isProvider
+                    ? 'Compartilhando sua localização em tempo real.'
                     : 'O profissional está a caminho.'}
               </Text>
               {loc ? (
                 <Text style={{ color: c.textTer, fontSize: 12, marginTop: 4 }}>
-                  {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)} · atualizado {new Date(loc.at).toLocaleTimeString('pt-BR')}
+                  {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                  {loc.accuracy != null ? ` · ±${Math.round(loc.accuracy)} m` : ''} · atualizado{' '}
+                  {new Date(loc.at).toLocaleTimeString('pt-BR')}
                 </Text>
               ) : null}
             </View>
 
-            {role === 'provider' ? (
-              <Button
-                variant={sharing ? 'danger' : 'primary'}
-                onPress={toggleShare}
-                style={{ marginTop: 16 }}
-              >
-                {sharing ? 'Parar deslocamento' : 'Iniciar deslocamento'}
-              </Button>
+            {isProvider ? (
+              sharing ? (
+                <>
+                  <Button loading={busy} onPress={() => stopSharing('arrived')} style={{ marginTop: 16 }}>
+                    Cheguei ao destino
+                  </Button>
+                  <Button variant="secondary" onPress={() => stopSharing('cancelled')} style={{ marginTop: 8 }}>
+                    Cancelar deslocamento
+                  </Button>
+                </>
+              ) : (
+                <Button loading={busy} onPress={toggleShare} style={{ marginTop: 16 }}>
+                  Iniciar deslocamento
+                </Button>
+              )
             ) : null}
           </>
         )}
