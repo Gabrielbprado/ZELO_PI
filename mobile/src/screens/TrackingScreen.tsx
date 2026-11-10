@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, View, Text } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Home, Navigation } from 'lucide-react-native';
@@ -34,6 +34,49 @@ function distMeters(a: { lat: number; lng: number }, b: { lat: number; lng: numb
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+function nextRand(seed: number): { value: number; next: number } {
+  const next = (seed * 16807) % 2147483647;
+  return { value: (next % 1000) / 1000, next };
+}
+
+type LandmarkType = 'building' | 'park' | 'market' | 'bank' | 'school';
+
+const LANDMARK_STYLE: Record<LandmarkType, { color: string; label: string }> = {
+  building: { color: '#94a3b8', label: '🏢' },
+  park: { color: '#22c55e', label: '🌳' },
+  market: { color: '#f59e0b', label: '🛒' },
+  bank: { color: '#6366f1', label: '🏦' },
+  school: { color: '#f43f5e', label: '🏫' },
+};
+
+function buildLandmarks(bookingId: string): Array<{ id: number; x: number; y: number; type: LandmarkType }> {
+  const seed = Math.abs(hashString(bookingId));
+  const types: LandmarkType[] = ['building', 'park', 'market', 'bank', 'school'];
+  const landmarks: Array<{ id: number; x: number; y: number; type: LandmarkType }> = [];
+  let s = seed;
+  for (let i = 0; i < 14; i++) {
+    const r1 = nextRand(s);
+    s = r1.next;
+    const r2 = nextRand(s);
+    s = r2.next;
+    const r3 = nextRand(s);
+    s = r3.next;
+    // Evita a faixa central da rota (16%..84% de largura, 8%..92% de altura).
+    const x = 4 + r1.value * 92;
+    const y = 8 + r2.value * 84;
+    const inRoute = x > 16 && x < 84 && y > 8 && y < 92;
+    if (inRoute) continue;
+    landmarks.push({ id: i, x, y, type: types[Math.floor(r3.value * types.length)] });
+  }
+  return landmarks;
+}
+
 function startErrorMessage(err: unknown): string {
   const apiErr = err as { response?: { data?: { error?: { message?: string } } } };
   return (
@@ -57,6 +100,8 @@ export default function TrackingScreen() {
   const [busy, setBusy] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'waiting' | 'active'>('idle');
   const watchSub = useRef<Location.LocationSubscription | null>(null);
+
+  const landmarks = useMemo(() => buildLandmarks(params.bookingId), [params.bookingId]);
 
   const stopWatch = useCallback(() => {
     watchSub.current?.remove();
@@ -128,8 +173,6 @@ export default function TrackingScreen() {
     [params.bookingId, stopWatch],
   );
 
-  // Profissional: abre a sessão no backend, pede permissão de GPS e passa a
-  // publicar a posição real do dispositivo via socket a cada atualização.
   const toggleShare = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -198,6 +241,8 @@ export default function TrackingScreen() {
     }
   }, [params.bookingId]);
 
+  const routeAheadH = PANEL_H - 16 - markerTop - MARKER / 2 - 20;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
       <PageHeader title="Deslocamento" subtitle="Acompanhe em tempo real" onBack={() => nav.goBack()} />
@@ -214,24 +259,54 @@ export default function TrackingScreen() {
           </View>
         ) : (
           <>
-            {/* "Mapa" — pista de rota com o profissional se aproximando do destino. */}
-            <View style={{ height: PANEL_H, backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.hairline, overflow: 'hidden' }}>
-              {/* linha da rota */}
-              <View style={{ position: 'absolute', left: '50%', top: 16, bottom: 16, width: 4, marginLeft: -2, backgroundColor: c.chartTrack, borderRadius: 2 }} />
-              <View style={{ position: 'absolute', left: '50%', top: markerTop + MARKER / 2, bottom: 16, width: 4, marginLeft: -2, backgroundColor: c.primary, borderRadius: 2 }} />
+            {/* ─── Mapa tipo Waze (grade de quadradinhos + pontos de referência) ─── */}
+            <View
+              style={[
+                styles.mapPanel,
+                {
+                  backgroundImage: `linear-gradient(${c.hairline} 1px, transparent 1px), linear-gradient(90deg, ${c.hairline} 1px, transparent 1px)`,
+                  backgroundSize: '40px 40px',
+                },
+              ]}
+            >
+              {/* Ruas principais verticais */}
+              <View style={[styles.road, { left: '24%' }]} />
+              <View style={[styles.road, { left: '76%' }]} />
+              {/* Linhas divisórias das ruas (tracejado) */}
+              <View style={[styles.laneLine, { left: '24%', top: 0, bottom: 0 }]} />
+              <View style={[styles.laneLine, { left: '76%', top: 0, bottom: 0 }]} />
 
-              {/* destino (casa do cliente) */}
-              <View style={{ position: 'absolute', left: '50%', bottom: 8, marginLeft: -20, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: c.successBg, borderWidth: 2, borderColor: c.success }}>
-                <Home size={20} color={c.success} />
+              {/* Pontos de referência (POIs) */}
+              {landmarks.map((l) => {
+                const style = LANDMARK_STYLE[l.type];
+                return (
+                  <View
+                    key={l.id}
+                    style={[
+                      styles.landmark,
+                      { left: `${l.x}%`, top: `${l.y}%`, backgroundColor: style.color },
+                    ]}
+                  >
+                    <Text style={styles.landmarkLabel}>{style.label}</Text>
+                  </View>
+                );
+              })}
+
+              {/* Rota à frente do profissional (tracejada) */}
+              <View style={[styles.routeLine, { top: markerTop + MARKER / 2, height: Math.max(0, routeAheadH) }]} />
+
+              {/* Marcador do profissional em movimento */}
+              <View style={[styles.providerMarker, { top: markerTop }]}>
+                <Navigation size={20} color={c.onPrimary} />
               </View>
 
-              {/* profissional em movimento */}
-              <View style={{ position: 'absolute', left: '50%', top: markerTop, marginLeft: -MARKER / 2, width: MARKER, height: MARKER, borderRadius: MARKER / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primary, borderWidth: 3, borderColor: c.onPrimary }}>
-                <Navigation size={20} color={c.onPrimary} />
+              {/* Destino (casa do cliente) */}
+              <View style={[styles.destinationMarker]}>
+                <Home size={20} color={c.success} />
               </View>
             </View>
 
-            {/* status */}
+            {/* ─── Status ─── */}
             <View style={{ marginTop: 16, flexDirection: 'row', justifyContent: 'space-between' }}>
               <View>
                 <Text style={{ color: c.textTer, fontSize: 12, fontWeight: '600' }}>DISTÂNCIA PERCORRIDA</Text>
@@ -292,3 +367,86 @@ export default function TrackingScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  mapPanel: {
+    width: '100%',
+    height: PANEL_H,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#e2e8f0',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  road: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: '12%',
+    backgroundColor: '#f1f5f9',
+  },
+  laneLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  landmark: {
+    position: 'absolute',
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  landmarkLabel: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  routeLine: {
+    position: 'absolute',
+    left: '50%',
+    width: 2,
+    borderWidth: 2,
+    borderColor: '#6366f1',
+    borderStyle: 'dashed',
+  },
+  providerMarker: {
+    position: 'absolute',
+    left: '50%',
+    width: MARKER,
+    height: MARKER,
+    marginLeft: -MARKER / 2,
+    borderRadius: MARKER / 2,
+    backgroundColor: '#3b82f6',
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
+  },
+  destinationMarker: {
+    position: 'absolute',
+    left: '50%',
+    bottom: 8,
+    marginLeft: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22c55e',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    zIndex: 10,
+  },
+});
