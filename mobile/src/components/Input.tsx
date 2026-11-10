@@ -2,19 +2,31 @@ import { useState } from 'react';
 import { TextInput, View, Text, TextInputProps, ViewStyle } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 
+const MAX_ERROR_LENGTH = 120;
+
 interface Props extends TextInputProps {
   label?: string;
   error?: string;
   containerStyle?: ViewStyle;
 }
 
+/**
+ * Campo de texto no padrão iOS: retângulo arredondado preenchido (estilo
+ * "grouped"), 17pt, e anel de foco na cor da marca — não sublinhado.
+ * Mensagens de erro longas são truncadas para não quebrar layout.
+ */
 export function Input({ label, error, containerStyle, ...rest }: Props) {
   const { theme } = useTheme();
   const [focused, setFocused] = useState(false);
+
+  const displayError = error && error.length > MAX_ERROR_LENGTH
+    ? error.slice(0, MAX_ERROR_LENGTH - 1).trimEnd() + '…'
+    : error;
+
   return (
-    <View style={[{ gap: 8 }, containerStyle]}>
+    <View style={[{ gap: 6 }, containerStyle]}>
       {label && (
-        <Text style={{ color: theme.colors.textSec, fontSize: 12, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+        <Text style={{ color: theme.colors.textSec, fontSize: 13, fontWeight: '600' }}>
           {label}
         </Text>
       )}
@@ -25,24 +37,25 @@ export function Input({ label, error, containerStyle, ...rest }: Props) {
         placeholderTextColor={theme.colors.textTer}
         style={[
           {
-            backgroundColor: 'transparent',
-            borderRadius: 0,
-            paddingHorizontal: 0,
-            paddingVertical: 14,
+            backgroundColor: theme.colors.surface2,
+            borderRadius: theme.radius.md,
+            paddingHorizontal: 14,
+            paddingVertical: 13,
             color: theme.colors.text,
             fontSize: 17,
-            borderWidth: 0,
-            borderBottomWidth: 1.5,
-            borderBottomColor: error
+            borderWidth: 1,
+            borderColor: error
               ? theme.colors.danger
               : focused
-                ? theme.colors.text
-                : theme.colors.hairline2,
+                ? theme.colors.primary
+                : theme.colors.hairline,
           },
           rest.style,
         ]}
       />
-      {error && <Text style={{ color: theme.colors.danger, fontSize: 12, fontWeight: '500' }}>{error}</Text>}
+      {displayError && (
+        <Text style={{ color: theme.colors.danger, fontSize: 13 }}>{displayError}</Text>
+      )}
     </View>
   );
 }

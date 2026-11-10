@@ -31,6 +31,12 @@ export const ROUTING_KEYS = {
   // serviço de notificações: advertência e suspensão só existem de verdade se a pessoa
   // souber que aconteceram.
   MODERATION_ACTIONED: 'moderation.actioned',
+  // Rastreamento em tempo real. Apenas ciclo de vida — coordenadas nunca viram evento,
+  // nunca saem do Redis. `started` dispara o canal de notificação ("prestador a caminho");
+  // `ended` é consumido para encerrar a visualização no cliente e dispara notificação de
+  // chegada/cancelamento.
+  TRAVEL_STARTED: 'travel.started',
+  TRAVEL_ENDED: 'travel.ended',
 } as const;
 
 export type RoutingKey = (typeof ROUTING_KEYS)[keyof typeof ROUTING_KEYS];
@@ -98,6 +104,23 @@ const pushTokenSet = z.object({
   pushToken: z.string().nullable(),
 });
 
+const travelStarted = z.object({
+  bookingId: z.string(),
+  providerId: z.string(),
+  providerUserId: z.string(),
+  clientId: z.string(),
+  startedAt: z.string(),
+});
+
+const travelEnded = z.object({
+  bookingId: z.string(),
+  providerId: z.string(),
+  providerUserId: z.string(),
+  clientId: z.string(),
+  reason: z.enum(['arrived', 'cancelled', 'timeout']),
+  endedAt: z.string(),
+});
+
 const moderationActioned = z.object({
   actionId: z.string(),
   reportId: z.string().nullable(),
@@ -123,6 +146,8 @@ export const EVENT_SCHEMAS = {
   [ROUTING_KEYS.BOOKING_REMINDER]: bookingReminder,
   [ROUTING_KEYS.USER_PUSHTOKEN_SET]: pushTokenSet,
   [ROUTING_KEYS.MODERATION_ACTIONED]: moderationActioned,
+  [ROUTING_KEYS.TRAVEL_STARTED]: travelStarted,
+  [ROUTING_KEYS.TRAVEL_ENDED]: travelEnded,
 } as const satisfies Record<RoutingKey, z.ZodTypeAny>;
 
 export type EventPayload<K extends RoutingKey> = z.infer<(typeof EVENT_SCHEMAS)[K]>;

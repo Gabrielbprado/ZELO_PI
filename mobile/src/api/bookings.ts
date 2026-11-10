@@ -15,6 +15,7 @@ export async function createBooking(input: {
   scheduledAt?: string;
   urgency?: 'EMERGENCY' | 'TODAY' | 'THIS_WEEK' | 'FLEXIBLE';
   priceEstimate?: number;
+  needsOnSiteQuote?: boolean;
 }): Promise<Booking> {
   const { data } = await api.post<Booking>('/bookings', input);
   return data;
@@ -26,5 +27,10 @@ export async function updateBookingStatus(
   priceFinal?: number,
 ): Promise<Booking> {
   const { data } = await api.patch<Booking>(`/bookings/${id}/status`, { status, priceFinal });
+  return data;
+}
+
+export async function updateBookingPrice(id: string, priceFinal: number): Promise<Booking> {
+  const { data } = await api.patch<Booking>(`/bookings/${id}/price`, { priceFinal });
   return data;
 }

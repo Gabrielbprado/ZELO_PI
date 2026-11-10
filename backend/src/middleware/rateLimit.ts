@@ -8,28 +8,6 @@ import { logger } from '../utils/logger';
 
 const AUTH_WINDOW_MS = 15 * ONE_MINUTE_MS;
 
-/**
- * Store de rate limit com Redis quando disponível e memória quando não.
- *
- * Três propriedades precisam valer ao mesmo tempo, e ingenuamente elas se atropelam:
- *
- * 1. **Com o Redis fora, a API não pode ficar mais lenta.** Sem cuidado, cada
- *    requisição espera o `commandTimeout` inteiro antes de ser liberada — medido em
- *    ~500ms por requisição, degradação pior do que nunca ter tido Redis.
- * 2. **Com o Redis fora, a API precisa SUBIR.** O `RedisStore` do `rate-limit-redis`
- *    dispara `SCRIPT LOAD` dentro do próprio construtor, que roda no import do módulo,
- *    e guarda a promessa sem ninguém aguardá-la. Se esse comando rejeitar de imediato,
- *    o Node encerra o processo por unhandled rejection — a API entra em loop de restart
- *    por causa de uma dependência que deveria ser opcional.
- * 3. **Com o Redis fora, o limite não pode simplesmente sumir.** Deixar passar tudo
- *    desligaria a proteção contra força bruta do `authLimiter` justamente durante um
- *    incidente. Cair para contagem em memória devolve exatamente o comportamento que o
- *    projeto tinha antes do Redis: menos preciso entre instâncias, mas presente.
- *
- * Daí a construção tardia e o fallback explícito: o `RedisStore` real só nasce no
- * primeiro `increment`, quando já há requisição em voo (e o `retryableIncrement` do
- * pacote envolve tudo em try/catch); enquanto ele não existe, quem conta é a memória.
- */
 class RedisWithMemoryFallbackStore implements Store {
   private redisStore?: RedisStore;
   private readonly memoryStore = new MemoryStore();
@@ -42,7 +20,6 @@ class RedisWithMemoryFallbackStore implements Store {
     this.memoryStore.init(options);
   }
 
-  /** Devolve o store do Redis se a conexão estiver de pé; senão, o de memória. */
   private resolve(): Store {
     const redis = getRateLimitRedis();
     if (!redis || redis.status !== 'ready') return this.memoryStore;
@@ -54,11 +31,6 @@ class RedisWithMemoryFallbackStore implements Store {
       });
       if (this.options) this.redisStore.init(this.options);
 
-      // `rate-limit-redis` dispara `SCRIPT LOAD` no construtor e guarda as promessas
-      // em campos públicos sem aguardá-las. Se o Redis cair entre a checagem de status
-      // acima e o comando, essas rejeições sobem como unhandled e derrubam o processo.
-      // O catch vazio não altera o fluxo — o pacote recarrega o script sozinho no
-      // primeiro erro de EVALSHA — apenas impede o crash.
       void this.redisStore.incrementScriptSha.catch(() => undefined);
       void this.redisStore.getScriptSha.catch(() => undefined);
 
@@ -72,7 +44,6 @@ class RedisWithMemoryFallbackStore implements Store {
     try {
       return await store.increment(key);
     } catch (err) {
-      // Redis caiu no meio do comando: conta em memória em vez de liberar.
       if (store === this.memoryStore) throw err;
       logger.debug({ err, prefix: this.keyPrefix }, 'rate limit caiu para o store em memória');
       return this.memoryStore.increment(key);
@@ -96,21 +67,14 @@ class RedisWithMemoryFallbackStore implements Store {
   }
 }
 
-/**
- * Exportada para teste: o `express-rate-limit` não expõe o store no middleware que
- * devolve, e o comportamento de fallback é justamente o que precisa de cobertura.
- */
 export function buildStore(prefix: string): Store | undefined {
-  // Sem Redis configurado, o padrão do express-rate-limit (MemoryStore) já basta —
-  // não há motivo para embrulhar.
-  if (!env.REDIS_ENABLED || !env.REDIS_URL) return undefined;
+  if (!env.REDIS_ENABLED || !env.REDIS_URL) {
+    logger.warn({ prefix }, 'Rate limiter usando store em memória (Redis desabilitado) — não funciona em múltiplas instâncias');
+    return undefined;
+  }
   return new RedisWithMemoryFallbackStore(prefix);
 }
 
-/**
- * Rede de segurança final: se nem o fallback em memória responder, a requisição passa.
- * Um contador indisponível não justifica derrubar a API.
- */
 const FAIL_OPEN = { passOnStoreError: true } as const;
 
 export const generalLimiter = rateLimit({
@@ -118,6 +82,7 @@ export const generalLimiter = rateLimit({
   store: buildStore('general'),
   windowMs: env.RATE_LIMIT_WINDOW_MS,
   max: env.RATE_LIMIT_MAX,
+  skip: (req) => req.path === '/api/v1/payments/webhook/asaas',
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -128,14 +93,21 @@ export const generalLimiter = rateLimit({
   },
 });
 
-/**
- * Limite próprio para a telemetria de recomendação.
- *
- * Impressões são tagarelas: um usuário rolando a Home gera várias por sessão.
- * Sem um limite dedicado, esses eventos consumiriam o orçamento do
- * `generalLimiter` (200/15min) e o app passaria a receber 429 em requisições
- * que realmente importam.
- */
+export const webhookLimiter = rateLimit({
+  ...FAIL_OPEN,
+  store: buildStore('webhook'),
+  windowMs: ONE_MINUTE_MS,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      code: ErrorCode.TOO_MANY_REQUESTS,
+      message: 'Muitos callbacks de pagamento. Tente novamente mais tarde.',
+    },
+  },
+});
+
 export const telemetryLimiter = rateLimit({
   ...FAIL_OPEN,
   store: buildStore('telemetry'),

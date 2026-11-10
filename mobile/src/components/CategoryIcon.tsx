@@ -7,7 +7,7 @@ interface Props { iconKey: string; size?: number; color?: string }
 export function CategoryIcon({ iconKey, size = 26, color }: Props) {
   const { theme } = useTheme();
   const stroke = color ?? theme.colors.text;
-  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   switch (iconKey) {
     case 'plumb':
       return (

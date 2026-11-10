@@ -5,6 +5,7 @@ import { startConsumer, stopConsumers } from './consumers/runtime';
 import { analyticsConsumer } from './consumers/analytics.consumer';
 import { remindersConsumer } from './consumers/reminders.consumer';
 import { ledgerConsumer } from './consumers/ledger.consumer';
+import { travelConsumer } from './consumers/travel.consumer';
 import { jobsEnabled } from '../config/jobs';
 
 /**
@@ -27,6 +28,9 @@ export async function startEvents(): Promise<void> {
   await startConsumer(analyticsConsumer);
   // Consumidor do ledger: escrow + comissão. Move dinheiro a partir dos eventos.
   await startConsumer(ledgerConsumer);
+  // Consumidor de travel: limpeza em cascata (booking.cancelled → travel.cancel) +
+  // fan-out para Socket.IO dos eventos de ciclo de vida da sessão de deslocamento.
+  await startConsumer(travelConsumer);
   // O consumidor de lembretes só faz sentido com jobs (BullMQ/Redis) ligados — é ele que
   // traduz booking.accepted/cancelled em jobs delayed.
   if (jobsEnabled()) await startConsumer(remindersConsumer);

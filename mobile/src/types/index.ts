@@ -72,12 +72,14 @@ export interface Booking {
   status: BookingStatus;
   priceEstimate?: number | null;
   priceFinal?: number | null;
+  needsOnSiteQuote?: boolean;
   completedAt?: string | null;
   createdAt: string;
   category?: Category;
   provider?: { id: string; user: { id: string; name: string; avatarHue: number } };
   client?: { id: string; name: string; avatarHue: number };
   reviews?: Array<{ id: string; authorId: string; targetId: string; rating: number; comment?: string | null }>;
+  payment?: { id: string; status: 'PENDING' | 'AUTHORIZED' | 'PAID' | 'REFUNDED' | 'FAILED'; method: string; amount: number } | null;
 }
 
 export interface Review {

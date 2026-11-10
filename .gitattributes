@@ -1,0 +1,8 @@
+# Scripts executados dentro de contêineres Linux precisam de LF, ou o `/bin/sh`
+# quebra no shebang. `core.autocrlf=true` no Windows converte tudo para CRLF sem
+# isto aqui.
+*.sh                text eol=lf
+docker-entrypoint*  text eol=lf
+Dockerfile*         text eol=lf
+*.yml               text eol=lf
+*.yaml              text eol=lf

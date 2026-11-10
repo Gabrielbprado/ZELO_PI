@@ -57,6 +57,18 @@ export interface ProviderLocation {
   lat: number;
   lng: number;
   at: string;
+  accuracy?: number | null;
+  speed?: number | null;
+}
+
+/** Payload cru do backend (`travel:location:update`) — coordenadas e timestamp completos. */
+interface TravelLocationPayload {
+  bookingId: string;
+  latitude: number;
+  longitude: number;
+  recordedAt: string;
+  accuracy?: number | null;
+  speed?: number | null;
 }
 
 export interface TrackingJoinResult {
@@ -69,7 +81,7 @@ export interface TrackingJoinResult {
 export async function joinTracking(bookingId: string): Promise<TrackingJoinResult> {
   const s = await getRealtimeSocket();
   return new Promise((resolve) => {
-    s.timeout(5000).emit('tracking:join', { bookingId }, (err: unknown, res: TrackingJoinResult) => {
+    s.timeout(5000).emit('travel:join', { bookingId }, (err: unknown, res: TrackingJoinResult) => {
       resolve(err ? { ok: false, error: 'timeout' } : res);
     });
   });
@@ -78,17 +90,40 @@ export async function joinTracking(bookingId: string): Promise<TrackingJoinResul
 /** Assina as atualizações de posição do profissional. Devolve um unsubscribe. */
 export async function onProviderLocation(cb: (loc: ProviderLocation) => void): Promise<() => void> {
   const s = await getRealtimeSocket();
-  s.on('location:provider', cb);
-  return () => s.off('location:provider', cb);
+  const handler = (raw: TravelLocationPayload) =>
+    cb({
+      bookingId: raw.bookingId,
+      lat: raw.latitude,
+      lng: raw.longitude,
+      at: raw.recordedAt,
+      accuracy: raw.accuracy ?? null,
+      speed: raw.speed ?? null,
+    });
+  s.on('travel:location:update', handler);
+  return () => s.off('travel:location:update', handler);
 }
 
 /** (Profissional) Publica a própria posição. */
-export async function emitLocation(bookingId: string, lat: number, lng: number): Promise<void> {
+export async function emitLocation(
+  bookingId: string,
+  lat: number,
+  lng: number,
+  accuracy?: number | null,
+  speed?: number | null,
+  recordedAt?: string,
+): Promise<void> {
   const s = await getRealtimeSocket();
-  s.emit('location:update', { bookingId, lat, lng });
+  s.emit('travel:location:update', {
+    bookingId,
+    latitude: lat,
+    longitude: lng,
+    accuracy: accuracy ?? null,
+    speed: speed ?? null,
+    recordedAt: recordedAt ?? new Date().toISOString(),
+  });
 }
 
 export async function leaveTracking(bookingId: string): Promise<void> {
   const s = await getRealtimeSocket();
-  s.emit('tracking:leave', { bookingId });
+  s.emit('travel:leave', { bookingId });
 }
