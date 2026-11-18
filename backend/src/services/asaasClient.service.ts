@@ -175,6 +175,15 @@ export async function createCustomer(input: { name: string; email: string; cpfCn
   return data?.id ?? null;
 }
 
+export async function updateCustomer(customerId: string, input: { cpfCnpj: string }): Promise<boolean> {
+  const res = await asaasFetch(`/customers/${encodeURIComponent(customerId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+  const data = await parse(res, customerSchema, 'updateCustomer');
+  return Boolean(data?.id);
+}
+
 export async function createPixPayment(input: {
   customerId: string;
   value: number;

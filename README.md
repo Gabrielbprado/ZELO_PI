@@ -93,8 +93,8 @@ TypeScript, app React Native e serviço de recomendação em Python.
 |---|---|
 | Backend — funcionalidade de produto | ✅ consolidado (auth, booking, chat, emergency, recomendação, pagamentos Asaas, moderação, financeiro) |
 | Backend — **GPS/Travel (Etapa 2)** | ✅ **implementado e testado**: `BookingTravel` + Redis efêmero + REST `/bookings/:id/travel/*` + Socket.IO `travel:*` + consumer outbox + jobs retry/timeout. Ver [`docs/plans/ETAPA_3_MOBILE_GPS.md`](./docs/plans/ETAPA_3_MOBILE_GPS.md) para o escopo mobile |
-| Mobile — funcionalidade de produto | ✅ consolidado (todos os fluxos exceto GPS em background) |
-| Mobile — **GPS/Travel (Etapa 3)** | ⏳ **planejado**: `react-native-maps` + `expo-location` + background service. Plano detalhado em [`docs/plans/ETAPA_3_MOBILE_GPS.md`](./docs/plans/ETAPA_3_MOBILE_GPS.md) |
+| Mobile — funcionalidade de produto | ✅ fluxos principais implementados; agenda e serviços seguem em revisão contínua |
+| Mobile — **GPS/Travel (Etapa 3)** | ⚙️ mapa OpenStreetMap e posição em tempo real implementados em primeiro plano; rastreamento não continua com a tela/app em segundo plano. Requer Redis e conexão com a internet. |
 | Observabilidade | ⚙️ scaffolding (Sentry gated por `SENTRY_DSN`; Prometheus+Grafana via profile `obs`) |
 | Backup Postgres automatizado | ⏳ script pronto em `scripts/backup-postgres.sh` — agendamento depende de credencial externa ([runbook](./docs/runbooks/BACKUP_RESTORE.md)) |
 | Retenção de eventos/auditoria | ⚙️ job implementado, **desligado por default** (`RETENTION_CLEANUP_ENABLED=false`) |
@@ -248,7 +248,7 @@ contêiner e solução de problemas: **[`docs/DOCKER.md`](./docs/DOCKER.md)**.
 | Node.js | 20 LTS ou 22 (veja `.nvmrc`) | obrigatório |
 | PostgreSQL | 14, 15 ou 16 **com PostGIS** | obrigatório |
 | Python | **3.12** (3.11 serve) | só para o serviço de ML — opcional |
-| Expo Go | última | só para rodar em celular físico |
+| Expo SDK | 58 | Android pode rodar pelo Expo Go; ver [`docs/SETUP.md`](./docs/SETUP.md#4-app-mobile) |
 
 > **Python 3.13/3.14 não.** As wheels de `scipy`/`scikit-learn` demoram a sair
 > para versões muito novas e o `pip` cai num build a partir do código-fonte que
@@ -325,12 +325,13 @@ npm run web        # navegador — http://localhost:8081
 Sem configuração extra o app descobre a API sozinho: `localhost:4000` no
 navegador e no simulador iOS, `10.0.2.2:4000` no emulador Android.
 
-**Celular físico:** rode `npm run start:lan`, leia o QR-code no Expo Go e aponte
-o app para o IP da sua máquina na LAN — `EXPO_PUBLIC_API_BASE_URL` no ambiente
-ou `expo.extra.apiBaseUrl` no `app.json`:
+**Celular Android:** abra no Expo Go pelo QR de `npm run start:mobile` (mesma rede Wi-Fi do computador).
+Para o app acessar a API, use o IP LAN do computador. No PowerShell:
 
-```bash
-EXPO_PUBLIC_API_BASE_URL="http://192.168.0.123:4000/api/v1" npm run start:lan
+```powershell
+$env:EXPO_PUBLIC_API_BASE_URL = "http://192.168.0.123:4000/api/v1"
+npx eas-cli build --profile development --platform android
+npm run start:mobile
 ```
 
 ### 4. Serviço de ML (opcional)
@@ -658,7 +659,7 @@ Segredos, blueprint e vínculo dos projetos: [`docs/DEPLOYMENT.md`](./docs/DEPLO
 
 | Documento | Status |
 |---|---|
-| [`docs/plans/ETAPA_3_MOBILE_GPS.md`](./docs/plans/ETAPA_3_MOBILE_GPS.md) | Plano detalhado da integração mobile (`react-native-maps` + `expo-location`) — **aguardando autorização** |
+| [`docs/plans/ETAPA_3_MOBILE_GPS.md`](./docs/plans/ETAPA_3_MOBILE_GPS.md) | Plano de referência para rastreamento GPS em segundo plano; mapa atual usa Leaflet/OpenStreetMap |
 | [`docs/proposals/CPF_AT_REST_PROTECTION.md`](./docs/proposals/CPF_AT_REST_PROTECTION.md) | Hash vs encryption de CPF em repouso — **decisão de produto/legal** |
 | [`docs/proposals/TRAVEL_TIMEOUT_8H.md`](./docs/proposals/TRAVEL_TIMEOUT_8H.md) | Threshold de 8h do `travel-timeout-active` — **decisão de produto** |
 | [`docs/audits/`](./docs/audits/) | Critérios PASS/FAIL e relatórios de auditoria técnica |

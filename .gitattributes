@@ -6,3 +6,4 @@ docker-entrypoint*  text eol=lf
 Dockerfile*         text eol=lf
 *.yml               text eol=lf
 *.yaml              text eol=lf
+mobile/zero-marketplace-development.apk filter=lfs diff=lfs merge=lfs -text

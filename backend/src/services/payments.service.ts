@@ -9,6 +9,7 @@ import {
   AsaasCardHolderInfo,
   AsaasCreditCardInput,
   createCustomer as asaasCreateCustomer,
+  updateCustomer as asaasUpdateCustomer,
   createPixPayment as asaasCreatePixPayment,
   createCardPayment as asaasCreateCardPayment,
   getPixQrCode as asaasGetPixQrCode,
@@ -124,14 +125,22 @@ async function ensureAsaasCustomer(userId: string): Promise<{ customerId: string
   });
   if (!user) throw new NotFoundError('Usuário não encontrado');
 
+  if (!user.cpf) {
+    throw new BadRequestError('CPF obrigatório para gerar cobrança. Informe-o em Perfil > Editar perfil e tente novamente.');
+  }
+
   if (user.asaasCustomerId) {
+    const synchronized = await asaasUpdateCustomer(user.asaasCustomerId, { cpfCnpj: user.cpf });
+    if (!synchronized) {
+      throw new BadRequestError('Não foi possível atualizar seu CPF no Asaas. Confira o CPF no perfil e tente novamente.');
+    }
     return { customerId: user.asaasCustomerId, user };
   }
 
   const customerId = await asaasCreateCustomer({
     name: user.name,
     email: user.email,
-    cpfCnpj: user.cpf ?? undefined,
+    cpfCnpj: user.cpf,
   });
   if (!customerId) throw new BadRequestError('Não foi possível registrar o cliente no gateway. Tente novamente.');
 
@@ -153,6 +162,10 @@ export async function createPaymentForBooking(userId: string, input: CreatePayme
   const amount = booking.priceFinal;
   if (!amount || amount <= 0) {
     throw new BadRequestError('O profissional ainda não definiu o valor final do serviço');
+  }
+
+  if (input.method === 'pix' && isAsaasConfigured() && amount < 5) {
+    throw new BadRequestError('O Asaas exige valor mínimo de R$ 5,00 para gerar PIX. Ajuste o valor final do serviço.');
   }
 
   if (booking.payment?.status === 'PAID') {
@@ -188,6 +201,7 @@ export async function createPaymentForBooking(userId: string, input: CreatePayme
   }
 
   let payment: Awaited<ReturnType<typeof prisma.payment.create>>;
+  let reusedExistingGatewayPayment = false;
 
   try {
     payment = await prisma.$transaction(async (tx) => {
@@ -203,12 +217,21 @@ export async function createPaymentForBooking(userId: string, input: CreatePayme
         const sameMethod = existing.method === input.method;
         const sameInstallments = existing.installments === input.installments;
         if (sameAmount && sameMethod && sameInstallments) {
-          if (input.method === 'cash' || existing.externalId) {
+          if (input.method === 'cash') {
             return existing;
           }
-          if (!existing.externalId) {
+          if (isAsaasChargeId(existing.externalId)) {
+            reusedExistingGatewayPayment = true;
+            return existing;
+          }
+          if (isPlaceholderExternalId(existing.externalId)) {
             throw new BadRequestError('A cobrança ainda está sendo gerada. Tente novamente em instantes.');
           }
+          // Registros antigos sem ID do Asaas podem ser recuperados sem travar o agendamento.
+          return tx.payment.update({
+            where: { id: existing.id },
+            data: { status: 'PENDING', amount, method: input.method, externalId: `pending_${uuidv4()}`, installments: input.installments },
+          });
         }
         throw new BadRequestError('Já existe um pagamento pendente para este agendamento');
       }
@@ -240,6 +263,11 @@ export async function createPaymentForBooking(userId: string, input: CreatePayme
       throw new ConflictError('Já existe um pagamento em processamento para este agendamento');
     }
     throw err;
+  }
+
+  if (reusedExistingGatewayPayment) {
+    const pix = payment.method === 'pix' ? await buildPixResponse(payment) : undefined;
+    return { payment, pix };
   }
 
   if (input.method === 'cash') {

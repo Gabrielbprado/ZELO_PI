@@ -9,6 +9,7 @@ export interface User {
   avatarHue: number;
   city?: string | null;
   neighborhood?: string | null;
+  cpf?: string | null;
   emailVerified: boolean;
 }
 

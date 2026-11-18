@@ -85,12 +85,12 @@ physical device, etc.
 ## Planned: GPS tracking in background (Etapa 3)
 
 The backend side of live GPS tracking is **already implemented** (`BookingTravel`
-session, Redis-only coordinates, REST + Socket.IO). The mobile side depends on
-`react-native-maps` + `expo-location` + a foreground service on Android and
-Background Modes on iOS — none of which are installed yet.
+session, Redis-only coordinates, REST + Socket.IO). The mobile app has
+foreground GPS tracking and an OpenStreetMap/Leaflet map. It does not need a
+Google Maps API key. Background tracking is not implemented.
 
 Full plan with permission hooks, the `useProviderTravel` hook, the task
 handler, and the 24 mandatory physical-device test cases is in
 [`../docs/plans/ETAPA_3_MOBILE_GPS.md`](../docs/plans/ETAPA_3_MOBILE_GPS.md).
-**Do not start this work without authorization** — it needs native deps + EAS
-Build + API keys + physical devices.
+Background tracking still needs native dependencies, an EAS build, and testing
+on physical devices.

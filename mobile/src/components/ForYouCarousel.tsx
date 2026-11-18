@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, FlatList, ActivityIndicator } from 'react-native';
+import type { FlatListProps } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAsync } from '../hooks/useAsync';
 import { getForYou, trackRecEvents } from '../api/recommendations';
@@ -10,6 +11,10 @@ import type { ForYouResponse, RecEventInput, RecommendedProvider } from '../type
 const LIMIT = 8;
 const IMPRESSION_FLUSH_MS = 1500;
 const VIEWABILITY = { itemVisiblePercentThreshold: 60, minimumViewTime: 400 };
+
+type OnViewableItemsChanged = NonNullable<
+  FlatListProps<RecommendedProvider>['onViewableItemsChanged']
+>;
 
 interface Props {
   onOpenProvider: (providerId: string) => void;
@@ -54,17 +59,19 @@ export function ForYouCarousel({ onOpenProvider, onSeeAll, refreshKey = 0 }: Pro
   }, [flush]);
 
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: RecommendedProvider; index: number | null }> }) => {
+    (info: Parameters<OnViewableItemsChanged>[0]) => {
+      const { viewableItems } = info;
       const dados = reco.data;
       if (!dados) return;
       for (const v of viewableItems) {
-        if (vistos.current.has(v.item.id)) continue;
-        vistos.current.add(v.item.id);
+        const item = v.item as RecommendedProvider;
+        if (vistos.current.has(item.id)) continue;
+        vistos.current.add(item.id);
         pendentes.current.push({
-          providerId: v.item.id,
+          providerId: item.id,
           type: 'IMPRESSION',
           position: v.index ?? 0,
-          score: v.item.score,
+          score: item.score,
           modelVersion: dados.modelVersion,
           strategy: dados.strategy,
         });

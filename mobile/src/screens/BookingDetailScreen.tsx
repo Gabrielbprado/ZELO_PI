@@ -210,6 +210,11 @@ export default function BookingDetailScreen() {
           <Text style={{ color: theme.colors.textTer, fontSize: 11, marginTop: 4 }}>
             Solicitado em {new Date(booking.createdAt).toLocaleString('pt-BR')}
           </Text>
+          {booking.scheduledAt && (
+            <Text style={{ color: theme.colors.primaryText, fontSize: 13, fontWeight: '700', marginTop: 4 }}>
+              Atendimento agendado para {new Date(booking.scheduledAt).toLocaleString('pt-BR')}
+            </Text>
+          )}
         </View>
 
         <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 16, borderWidth: 1, borderColor: theme.colors.hairline, gap: 8 }}>
@@ -252,7 +257,7 @@ export default function BookingDetailScreen() {
         {canAccept    && <Button loading={busy} onPress={() => change('ACCEPTED')}>Aceitar serviço</Button>}
         {canStart     && <Button loading={busy} onPress={() => change('IN_PROGRESS')}>Iniciar serviço</Button>}
         {['ACCEPTED', 'IN_PROGRESS'].includes(booking.status) && (
-          <Button variant="secondary" onPress={() => nav.navigate('Tracking', { bookingId: booking.id })}>
+          <Button variant="secondary" onPress={() => nav.navigate('Tracking', { bookingId: booking.id, destinationAddress: booking.address })}>
             {isProvider ? 'Compartilhar deslocamento' : 'Acompanhar deslocamento'}
           </Button>
         )}
@@ -320,7 +325,7 @@ export default function BookingDetailScreen() {
       <Modal visible={priceModal !== null} transparent animationType="fade" onRequestClose={() => setPriceModal(null)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          style={{ flex: 1, backgroundColor: theme.colors.overlay, alignItems: 'center', justifyContent: 'center', padding: 24 }}
         >
           <View style={{ width: '100%', maxWidth: 380, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 20, gap: 12, borderWidth: 1, borderColor: theme.colors.hairline }}>
             <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '800' }}>

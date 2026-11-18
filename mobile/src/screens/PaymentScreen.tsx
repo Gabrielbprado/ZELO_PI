@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, Alert, ScrollView, Image, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, Pressable, ScrollView, Image, ActivityIndicator, TextInput } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -41,6 +41,8 @@ export default function PaymentScreen() {
   const [busy, setBusy] = useState(false);
   const [pix, setPix] = useState<paymentsApi.PixInfo | null>(null);
   const [awaiting, setAwaiting] = useState<PaymentMethod | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [confirmedAmount, setConfirmedAmount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [expiresIn, setExpiresIn] = useState<number | null>(null);
@@ -73,9 +75,8 @@ export default function PaymentScreen() {
         const p = await paymentsApi.getPaymentByBooking(params.bookingId);
         if (!p || !mounted) return;
         if (p.status === 'PAID') {
-          Alert.alert('Pagamento confirmado', 'Este serviço já foi pago.', [
-            { text: 'Ok', onPress: () => nav.goBack() },
-          ]);
+          setPaymentConfirmed(true);
+          setConfirmedAmount(p.amount);
           return;
         }
         if (p.status === 'FAILED' || p.status === 'REFUNDED') {
@@ -88,10 +89,22 @@ export default function PaymentScreen() {
         setMethod(m);
         setAwaiting(m);
         if (m === 'pix') {
-          const info = await paymentsApi.getPixForBooking(params.bookingId);
-          if (mounted && info) {
-            setPix(info);
-            setExpiresIn(info.expiresInSec ?? null);
+          try {
+            const info = await paymentsApi.getPixForBooking(params.bookingId);
+            if (!mounted) return;
+            if (info) {
+              setPix(info);
+              setExpiresIn(info.expiresInSec ?? null);
+            } else {
+              setAwaiting(null);
+              setError('Esta cobrança não tem um QR PIX válido. Toque em Gerar PIX para tentar novamente.');
+            }
+          } catch (e) {
+            if (!mounted) return;
+            setAwaiting(null);
+            setError(e instanceof AxiosError
+              ? (e.response?.data?.error?.message ?? 'Não foi possível carregar o QR PIX. Tente gerar uma nova cobrança.')
+              : 'Não foi possível carregar o QR PIX. Tente gerar uma nova cobrança.');
           }
         }
       } catch { /* sem pagamento ainda */ }
@@ -113,12 +126,13 @@ export default function PaymentScreen() {
   }, [method, params.amount]);
 
   const onPaid = useCallback((amount: number) => {
-    Alert.alert(
-      'Pagamento confirmado',
-      `${formatReais(amount)} recebidos com sucesso. O profissional foi avisado que o serviço está liberado.`,
-      [{ text: 'Ok', onPress: () => nav.goBack() }],
-    );
-  }, [nav]);
+    setPaymentConfirmed(true);
+    setConfirmedAmount(amount);
+    setAwaiting(null);
+    setPix(null);
+    setExpiresIn(null);
+    setError(null);
+  }, []);
 
   // Polling: enquanto estamos aguardando, pergunta ao back se já virou PAID.
   //   PIX    → PAID vem do webhook do Asaas (ou FAILED se expirou/foi recusado)
@@ -240,14 +254,14 @@ export default function PaymentScreen() {
     debit_card:  { label: 'Débito',   tone: 'primary' },
   };
 
-  const step = !awaiting ? 1 : 2;
+  const step = paymentConfirmed ? 2 : !awaiting ? 1 : 2;
   const expired = expiresIn != null && expiresIn <= 0;
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: c.bg }}>
       <PageHeader
         title="Pagamento"
-        subtitle={`Etapa ${step} de 2 · ${!awaiting ? 'Escolha o método' : awaiting === 'pix' ? 'Aguardando o banco' : awaiting === 'cash' ? 'Aguardando o profissional' : 'Processando cartão'}`}
+        subtitle={paymentConfirmed ? 'Pagamento confirmado' : `Etapa ${step} de 2 · ${!awaiting ? 'Escolha o método' : awaiting === 'pix' ? 'Aguardando o banco' : awaiting === 'cash' ? 'Aguardando o profissional' : 'Processando cartão'}`}
         onBack={() => nav.goBack()}
         right={awaiting ? <Badge tone={badgeByMethod[awaiting].tone}>{badgeByMethod[awaiting].label}</Badge> : undefined}
       />
@@ -293,7 +307,19 @@ export default function PaymentScreen() {
           </View>
         </View>
 
-        {!awaiting && (
+        {paymentConfirmed && (
+          <View accessibilityRole="summary" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderRadius: theme.radius.lg, backgroundColor: c.successBg, borderWidth: 1, borderColor: c.successBorder }}>
+            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
+              <Check size={18} color={c.success} strokeWidth={3} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: c.success, fontSize: 15, fontWeight: '800' }}>Pagamento confirmado</Text>
+              <Text style={{ color: c.textSec, fontSize: 12, marginTop: 3 }}>{confirmedAmount != null ? `${formatReais(confirmedAmount)} recebidos. ` : ''}O banco confirmou o pagamento. O QR Code não é mais necessário.</Text>
+            </View>
+          </View>
+        )}
+
+        {!awaiting && !paymentConfirmed && (
           <View style={{ gap: 8 }}>
             <Text style={{ color: c.textSec, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Método de pagamento</Text>
             {methods.map((m) => {
@@ -330,7 +356,7 @@ export default function PaymentScreen() {
           </View>
         )}
 
-        {!awaiting && isCardMethod(method) && (
+        {!awaiting && !paymentConfirmed && isCardMethod(method) && (
           <View style={{ gap: 10, backgroundColor: c.surface, borderRadius: theme.radius.lg, padding: 16, borderWidth: 1, borderColor: c.hairline }}>
             <Text style={{ color: c.textSec, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Dados do cartão</Text>
             <CardTextField label="Nome como impresso" value={cardHolderName} onChangeText={setCardHolderName} autoCapitalize="characters" />
@@ -434,7 +460,7 @@ export default function PaymentScreen() {
 
             {awaiting === 'pix' && pix?.qrCode?.startsWith('data:image') && !expired && (
               <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-                <View style={{ padding: 12, backgroundColor: '#FFFFFF', borderRadius: theme.radius.md }}>
+                <View style={{ padding: 12, backgroundColor: c.onPrimary, borderRadius: theme.radius.md }}>
                   <Image source={{ uri: pix.qrCode }} style={{ width: 208, height: 208 }} resizeMode="contain" accessibilityLabel="QR Code do PIX" />
                 </View>
                 <Text style={{ color: c.textTer, fontSize: 11, marginTop: 8 }}>Abra a câmera do app do banco e aponte</Text>
@@ -475,14 +501,14 @@ export default function PaymentScreen() {
           </View>
         )}
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: c.successBg, borderWidth: 1, borderColor: c.successBorder }}>
+        {!paymentConfirmed && <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: theme.radius.md, backgroundColor: c.successBg, borderWidth: 1, borderColor: c.successBorder }}>
           <ShieldCheck size={14} color={c.success} />
           <Text style={{ color: c.success, fontSize: 12, fontWeight: '600', flex: 1 }}>
             {awaiting === 'cash'
               ? 'Sem calote: só o profissional confirma o recebimento'
               : 'Confirmação automática pelo banco quando o valor cair'}
           </Text>
-        </View>
+        </View>}
 
         {error && (
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: theme.radius.md, backgroundColor: c.dangerBg, borderWidth: 1, borderColor: c.dangerBorder }}>
@@ -491,7 +517,7 @@ export default function PaymentScreen() {
           </View>
         )}
 
-        {awaiting ? (
+        {!paymentConfirmed && (awaiting ? (
           <View style={{ gap: 8 }}>
             {!expired && (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 6 }}>
@@ -519,7 +545,7 @@ export default function PaymentScreen() {
                 ? 'Combinar pagamento em dinheiro'
                 : `Pagar ${formatReais(selectedInstallment?.totalAmount ?? params.amount)}`}
           </Button>
-        )}
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { View, Text, Pressable, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, TextInput, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { CalendarClock, ChevronRight, Plus, ShieldCheck, Trash2, Wallet } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,16 +24,31 @@ export default function ProviderManageScreen() {
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serviceModal, setServiceModal] = useState(false);
+  const [serviceTitle, setServiceTitle] = useState('');
+  const [servicePrice, setServicePrice] = useState('');
+  const [serviceCategoryId, setServiceCategoryId] = useState('');
+  const [serviceSaving, setServiceSaving] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [me, cats] = await Promise.all([providerSelf.getMyProvider(), providersApi.getCategories()]);
-    setProfile(me);
-    setCategories(cats);
-    setBio(me.bio ?? '');
-    setPriceFromStr(String(me.priceFrom ?? 0));
-    setYearsExpStr(String(me.yearsExp ?? 0));
-    setAvailable(me.available);
-    setSelectedCats(me.categories.map((c) => c.categoryId));
+    setLoadingProfile(true);
+    setLoadError(null);
+    try {
+      const [me, cats] = await Promise.all([providerSelf.getMyProvider(), providersApi.getCategories()]);
+      setProfile(me);
+      setCategories(cats);
+      setBio(me.bio ?? '');
+      setPriceFromStr(String(me.priceFrom ?? 0));
+      setYearsExpStr(String(me.yearsExp ?? 0));
+      setAvailable(me.available);
+      setSelectedCats(me.categories.map((c) => c.categoryId));
+    } catch {
+      setLoadError('Não foi possível carregar seu perfil profissional. Confira sua conexão e tente novamente.');
+    } finally {
+      setLoadingProfile(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -61,31 +76,36 @@ export default function ProviderManageScreen() {
   };
 
   const addService = () => {
-    Alert.prompt?.(
-      'Novo serviço',
-      'Título do serviço (ex.: Vazamento de torneira)',
-      async (title) => {
-        if (!title || title.trim().length < 2) return;
-        Alert.prompt?.('Preço mínimo (R$)', 'Valor de partida', async (priceText) => {
-          const priceMin = Math.max(0, parseInt(priceText || '0', 10) || 0);
-          if (!profile) return;
-          try {
-            await providerSelf.createMyService({
-              title: title.trim(),
-              categoryId: profile.categories[0]?.categoryId ?? categories[0]?.id ?? '',
-              priceMin,
-            });
-            await load();
-          } catch (e) {
-            Alert.alert('Erro', e instanceof AxiosError ? (e.response?.data?.error?.message ?? 'Falha') : 'Erro');
-          }
-        }, 'plain-text', '120');
-      },
-      'plain-text',
-    );
-    // Em Android Alert.prompt não existe — fallback simples: abre modal próprio (não implementado)
-    if (Platform.OS === 'android') {
-      Alert.alert('Indisponível no Android', 'A criação rápida de serviço requer iOS por enquanto.');
+    setServiceTitle('');
+    setServicePrice('');
+    setServiceCategoryId(profile?.categories[0]?.categoryId ?? categories[0]?.id ?? '');
+    setServiceModal(true);
+  };
+
+  const saveService = async () => {
+    const title = serviceTitle.trim();
+    const priceMin = Number.parseInt(servicePrice.replace(/\D/g, ''), 10);
+    if (title.length < 2) {
+      Alert.alert('Título inválido', 'Informe um título com pelo menos 2 caracteres.');
+      return;
+    }
+    if (!serviceCategoryId) {
+      Alert.alert('Categoria necessária', 'Cadastre uma categoria no seu perfil antes de criar o serviço.');
+      return;
+    }
+    if (!Number.isFinite(priceMin) || priceMin < 0) {
+      Alert.alert('Preço inválido', 'Informe um preço mínimo válido.');
+      return;
+    }
+    setServiceSaving(true);
+    try {
+      await providerSelf.createMyService({ title, categoryId: serviceCategoryId, priceMin });
+      setServiceModal(false);
+      await load();
+    } catch (e) {
+      Alert.alert('Erro', e instanceof AxiosError ? (e.response?.data?.error?.message ?? 'Não foi possível cadastrar o serviço.') : 'Não foi possível cadastrar o serviço.');
+    } finally {
+      setServiceSaving(false);
     }
   };
 
@@ -106,11 +126,20 @@ export default function ProviderManageScreen() {
     setSelectedCats((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   };
 
-  if (!profile) {
+  if (loadingProfile && !profile) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.bg }}>
         <ActivityIndicator color={theme.colors.primary} />
       </View>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+        <Text style={{ color: theme.colors.danger, textAlign: 'center' }}>{loadError ?? 'Perfil profissional indisponível.'}</Text>
+        <Button variant="secondary" onPress={load}>Tentar novamente</Button>
+      </SafeAreaView>
     );
   }
 
@@ -274,6 +303,29 @@ export default function ProviderManageScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal visible={serviceModal} transparent animationType="slide" onRequestClose={() => setServiceModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: theme.colors.overlay }}>
+          <View style={{ backgroundColor: theme.colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 14 }}>
+            <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '800' }}>Novo serviço</Text>
+            <Input label="Título do serviço" placeholder="Ex.: Vazamento de torneira" value={serviceTitle} onChangeText={setServiceTitle} />
+            <Input label="Preço mínimo (R$)" placeholder="0" value={servicePrice} onChangeText={(value) => setServicePrice(value.replace(/\D/g, ''))} keyboardType="number-pad" />
+            <Text style={{ color: theme.colors.textSec, fontSize: 12, fontWeight: '600' }}>Categoria</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {categories.map((category) => {
+                const selected = serviceCategoryId === category.id;
+                return (
+                  <Pressable key={category.id} onPress={() => setServiceCategoryId(category.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: selected ? theme.colors.primaryDeep : theme.colors.surface, borderWidth: 1, borderColor: selected ? theme.colors.primaryHi : theme.colors.hairline }}>
+                    <Text style={{ color: selected ? theme.colors.onPrimary : theme.colors.text, fontSize: 12, fontWeight: '600' }}>{category.name}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Button loading={serviceSaving} onPress={saveService}>Cadastrar serviço</Button>
+            <Button variant="secondary" onPress={() => setServiceModal(false)}>Cancelar</Button>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }

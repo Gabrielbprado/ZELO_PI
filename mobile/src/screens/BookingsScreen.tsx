@@ -9,6 +9,7 @@ import { EmptyState } from '../components/EmptyState';
 import { SkeletonList } from '../components/Skeleton';
 import { Avatar } from '../components/Avatar';
 import { Badge } from '../components/Badge';
+import { Button } from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
 import * as bookingsApi from '../api/bookings';
 import { formatReais } from '../utils/money';
@@ -40,11 +41,15 @@ export default function BookingsScreen() {
   const [items, setItems] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       const result = await bookingsApi.listMyBookings();
       setItems(result);
+    } catch {
+      setError('Não foi possível carregar sua agenda. Confira sua conexão e tente novamente.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -66,6 +71,11 @@ export default function BookingsScreen() {
 
       {loading ? (
         <SkeletonList />
+      ) : error ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+          <Text style={{ color: theme.colors.danger, textAlign: 'center' }}>{error}</Text>
+          <Button variant="secondary" onPress={load}>Tentar novamente</Button>
+        </View>
       ) : items.length === 0 ? (
         <EmptyState
           icon={<CalendarClock size={24} color={theme.colors.textSec} />}
@@ -119,7 +129,9 @@ export default function BookingsScreen() {
                     </Text>
                   ) : (
                     <Text style={{ color: theme.colors.textTer, fontSize: 11, marginTop: 4 }}>
-                      {new Date(item.createdAt).toLocaleDateString('pt-BR')}
+                      {item.scheduledAt
+                        ? `Atendimento · ${new Date(item.scheduledAt).toLocaleString('pt-BR')}`
+                        : `Solicitado · ${new Date(item.createdAt).toLocaleDateString('pt-BR')}`}
                     </Text>
                   )}
                 </View>

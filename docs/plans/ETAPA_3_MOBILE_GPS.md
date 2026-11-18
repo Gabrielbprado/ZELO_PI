@@ -4,7 +4,7 @@
 
 ## Decisões já fixadas
 
-- **Mapas:** `react-native-maps`.
+- **Mapas:** Leaflet em WebView com tiles OpenStreetMap (implementado no app; sem chave de API).
 - **GPS/Background:** `expo-location` + `expo-task-manager`.
 - **Contratos backend:** congelados na Etapa 2 (ver `src/routes/bookings.routes.ts` + eventos `travel:*`).
 
@@ -14,7 +14,7 @@
 ┌─────────────────────────────────────────────────┐
 │ TrackingScreen (provider ou client)             │
 │ - usa hook useProviderTravel ou useClientTravel │
-│ - renderiza <MapView> (react-native-maps)       │
+│ - renderiza <OpenStreetMapView> (Leaflet/OSM)    │
 └──────────────┬──────────────────────────────────┘
                │
    ┌───────────┴───────────┐
@@ -46,7 +46,7 @@
 
 ```bash
 cd mobile
-npx expo install react-native-maps
+npx expo install react-native-webview
 npx expo install expo-location expo-task-manager
 ```
 
@@ -90,16 +90,13 @@ Versões ancoradas pelo `expo install` à SDK 58 — **não trocar para versões
         "FOREGROUND_SERVICE_LOCATION"
       ],
       "config": {
-        "googleMaps": {
-          "apiKey": "EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_KEY"
-        }
       }
     }
   }
 }
 ```
 
-**Dependência externa:** chave Google Maps Android (console Google Cloud). iOS usa Apple Maps nativo, sem chave. Web não é target da feature GPS.
+**Mapa:** tiles públicos do OpenStreetMap, com atribuição visível e respeitando a política de uso. A tela web usa a incorporação do OpenStreetMap.
 
 **Crítico:** depois de editar `app.json`, **tem que rebuildar o app com EAS Build**. Expo Go não carrega plugins nativos novos. `npm start` continua funcionando em dev, mas o background location só acorda em dev-client ou standalone.
 
@@ -250,7 +247,6 @@ Ao `endedReason` chegar (via socket OU detecção local):
 
 ## Pendências externas antes da Etapa 3
 
-- [ ] **Chave API Google Maps Android** no console Google Cloud, restrita por package name + SHA-1 do EAS Build.
 - [ ] **EAS Build provisioning iOS** configurado com Background Modes (Capability).
 - [ ] **Devices físicos** para testes (não simulador — background location é restrito em simulador).
 - [ ] **TestFlight / interno Google Play** para distribuir o build com background location.
@@ -260,7 +256,7 @@ Ao `endedReason` chegar (via socket OU detecção local):
 - **R-M1 — OEMs Android chineses (Xiaomi, Huawei, Oppo) matam background agressivamente.** `expo-location` com foreground service mitiga mas não resolve totalmente. Testar em Xiaomi explicitamente.
 - **R-M2 — iOS Low Power Mode reduz frequência de updates.** Não há API para contornar. Aceito; cliente vê "stale" nessa condição.
 - **R-M3 — Rebuild obrigatório após plugin novo.** Expo Go stakeholders precisam saber que a feature exige build nativo.
-- **R-M4 — Google Maps API Key em env público (`EXPO_PUBLIC_*`) é inlinada no bundle.** Padrão para maps keys, mas precisa de restrição por package name + SHA-1 no console.
+- **R-M4 — Tiles OSM públicos não têm SLA.** Para tráfego alto, adotar um provedor OSM com capacidade e termos adequados.
 
 ## Estimativa
 

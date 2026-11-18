@@ -138,44 +138,45 @@ cd mobile
 npm install
 ```
 
-### 4.1. Apontar para a API
+### 4.1. Requisitos para Android/iOS
 
-`mobile/app.json` define `expo.extra.apiBaseUrl`. Por padrão, o app tenta detectar automaticamente:
-- **Web**: usa o hostname atual + porta `4000`
-- **Android emulator**: `http://10.0.2.2:4000/api/v1` (atalho do AVD para `localhost` do host)
-- **iOS simulator / outros**: `http://localhost:4000/api/v1`
+- Node.js 22 (ou versão indicada em `.nvmrc`) e dependências instaladas com `npm install`.
+- Celular Android 7+ ou iPhone/iPad com iOS 16.4+; para desenvolvimento, computador e celular na mesma rede Wi-Fi.
+- API ZELO rodando e acessível pelo IP da máquina na porta `4000`. O celular não consegue usar `localhost` para chegar ao computador.
+- O mapa de deslocamento usa Leaflet e tiles do OpenStreetMap, sem chave de API. É necessário acesso à internet; mantenha visível a atribuição do OpenStreetMap.
+- Redis habilitado no backend para armazenar temporariamente a posição do deslocamento. Sem Redis, a API não aceita atualizações GPS.
 
-Para **dispositivo físico**, descubra o IP da sua máquina na LAN e ajuste:
+No PowerShell, informe o IP da máquina antes de iniciar o Metro (troque pelo IP local do computador):
 
-```json
-{
-  "expo": {
-    "extra": {
-      "apiBaseUrl": "http://192.168.0.123:4000/api/v1"
-    }
-  }
-}
+```powershell
+$env:EXPO_PUBLIC_API_BASE_URL = "http://192.168.0.123:4000/api/v1"
 ```
 
-Confira que o backend está escutando na LAN e que o firewall libera a porta 4000.
+O app também tenta usar o IP LAN anunciado pelo Metro automaticamente. Use a variável acima quando a detecção automática não encontrar o host correto. O `app.config.js` libera HTTP só em builds que não sejam o perfil EAS `production`; produção deve usar API HTTPS.
 
-### 4.2. Rodar
+### 4.2. Gerar e abrir o app no celular
+
+Este projeto usa Expo SDK 58. No Android, `expo-location` e `react-native-webview` estão disponíveis no Expo Go, então não é preciso gerar APK de desenvolvimento para testar.
+
+Instale/atualize o Expo Go pela Play Store, deixe o celular e o computador na mesma rede Wi-Fi e rode:
+
+```bash
+cd mobile
+npm run start:mobile
+```
+
+Abra o Expo Go no Android e escaneie o QR Code do Metro. A conta Expo não precisa ser a mesma para abrir o QR local no Android. Para que o restante do app fale com a API, configure `EXPO_PUBLIC_API_BASE_URL` para o IP LAN do computador, como na seção anterior.
+
+### 4.3. Comandos
 
 | Comando | O que faz |
 |---------|-----------|
-| `npm run start`        | abre o Metro bundler (escolha a, i ou w) |
-| `npm run start:lan`    | força modo LAN (necessário pra Expo Go em celular físico) |
-| `npm run start:tunnel` | usa túnel ngrok (quando LAN não funciona) |
-| `npm run android`      | sobe direto no emulador Android |
+| `npm run start:mobile` | inicia Metro na porta 8081 em LAN para o Expo Go, limpando cache |
+| `npm run start:lan`    | inicia Metro em LAN |
+| `npm run start:tunnel` | usa túnel quando a rede local bloqueia Metro (API ainda precisa estar acessível ao telefone) |
+| `npm run android`      | abre o projeto no emulador Android |
 | `npm run ios`          | sobe direto no simulador iOS (macOS) |
 | `npm run web`          | abre em `http://localhost:8081` no navegador |
-
-### 4.3. Testar em celular físico
-
-1. Instale o **Expo Go** na loja de apps.
-2. No mesmo Wi-Fi do PC, rode `npm run start:lan` no diretório `mobile/`.
-3. Escaneie o QR-code com a câmera (iOS) ou pelo próprio Expo Go (Android).
-4. Se o `apiBaseUrl` apontar pra `localhost`, o celular não vai alcançar — ajuste para o IP da LAN como descrito acima.
 
 ### 4.4. Tema claro / escuro
 

@@ -26,7 +26,7 @@ router.post('/',                                 validate(paymentCreateSchema), 
 router.post('/:bookingId/confirm',               validate({ params: bookingIdParam }),    ctrl.confirm);
 router.post('/:bookingId/admin/force-confirm',   requireRole(Role.ADMIN), validate({ params: bookingIdParam }), ctrl.adminForceConfirm);
 router.get ('/:bookingId/pix',                   validate({ params: bookingIdParam }),    ctrl.getPix);
-router.get ('/:bookingId',                       validate({ params: bookingIdParam }),    ctrl.getByBooking);
 router.get ('/installments',                     validate({ query: z.object({ amount: z.coerce.number().positive() }) }), ctrl.getInstallments);
+router.get ('/:bookingId',                       validate({ params: bookingIdParam }),    ctrl.getByBooking);
 
 export default router;

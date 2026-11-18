@@ -20,6 +20,10 @@ export interface TravelLocationInput {
   recordedAt: string;
 }
 
+export interface TravelLocation extends TravelLocationInput {
+  bookingId: string;
+}
+
 /** (Prestador) Abre a sessão de deslocamento. Idempotente enquanto estiver ACTIVE. */
 export async function startTravel(bookingId: string): Promise<TravelSession> {
   const { data } = await api.post<{ session: TravelSession }>(`/bookings/${bookingId}/travel/start`);
@@ -41,4 +45,10 @@ export async function cancelTravel(bookingId: string): Promise<TravelSession> {
 /** Fallback REST para publicar posição (usado quando o socket não está disponível). */
 export async function postLocation(bookingId: string, input: TravelLocationInput): Promise<void> {
   await api.post(`/bookings/${bookingId}/travel/location`, input);
+}
+
+/** Recupera a última posição efêmera ao entrar depois que o prestador já iniciou. */
+export async function getCurrentLocation(bookingId: string): Promise<TravelLocation | null> {
+  const { data } = await api.get<{ location: TravelLocation | null }>(`/bookings/${bookingId}/travel/location`);
+  return data.location;
 }

@@ -13,8 +13,11 @@ import * as availApi from '../api/availability';
 import type { AppStackParamList } from '../navigation/types';
 
 const nextDays = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date(Date.now() + i * 86_400_000);
-  return { date: d.toISOString().slice(0, 10), label: d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' }) };
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + i);
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return { date, label: d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' }) };
 });
 const slotTime = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
@@ -41,16 +44,19 @@ export default function BookingScreen() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<availApi.Slot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 
   const pickDate = async (date: string) => {
     setSelectedDate(date);
     setSelectedSlot(null);
     setSlotsLoading(true);
+    setSlotsError(false);
     try {
       setSlots(await availApi.getSlots(params.providerId, date));
     } catch {
       setSlots([]);
+      setSlotsError(true);
     } finally {
       setSlotsLoading(false);
     }
@@ -195,6 +201,8 @@ export default function BookingScreen() {
             {selectedDate && (
               slotsLoading ? (
                 <Text style={{ color: theme.colors.textTer, fontSize: 12 }}>Carregando horários…</Text>
+              ) : slotsError ? (
+                <Text style={{ color: theme.colors.danger, fontSize: 12 }}>Não foi possível consultar os horários. Tente selecionar o dia novamente.</Text>
               ) : slots.length === 0 ? (
                 <Text style={{ color: theme.colors.textTer, fontSize: 12 }}>Sem horários livres neste dia.</Text>
               ) : (

@@ -15,9 +15,11 @@ function futureDate(daysAhead: number): string {
 function weekdayOf(dateStr: string): number {
   return new Date(`${dateStr}T00:00:00.000Z`).getUTCDay();
 }
-/** Um Date em UTC no dia `dateStr` às `hour`:00. */
+/** Converte horário civil de Brasília em instante UTC para persistir o booking. */
 function atHour(dateStr: string, hour: number): Date {
-  return new Date(`${dateStr}T${String(hour).padStart(2, '0')}:00:00.000Z`);
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  date.setUTCHours(hour + 3);
+  return date;
 }
 
 describe('disponibilidade do profissional', () => {

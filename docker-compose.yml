@@ -120,7 +120,9 @@ services:
     env_file:
       - .env
     environment:
-      NODE_ENV: production
+      # Compose is the local demo/development stack. Production uses the Render
+      # service and must keep the production-only secret validation enabled.
+      NODE_ENV: development
       PORT: 4000
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-zero_marketplace}?schema=public
       TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/zero_marketplace_test?schema=public
@@ -150,11 +152,7 @@ services:
       NOTIFICATIONS_SERVICE_TOKEN: ${NOTIFICATIONS_SERVICE_TOKEN:-dev_only_notifications_token_troque_isto}
       # Asaas (gateway de pagamento: PIX + cartão). Desligado por padrão — ligue no
       # `.env` da raiz para cobrar de verdade (sandbox: $aact_YTU5...).
-      ASAAS_ENABLED: ${ASAAS_ENABLED:-false}
-      ASAAS_BASE_URL: ${ASAAS_BASE_URL:-https://sandbox.asaas.com/api/v3}
-      ASAAS_API_KEY: ${ASAAS_API_KEY:-}
-      ASAAS_WEBHOOK_TOKEN: ${ASAAS_WEBHOOK_TOKEN:-dev_only_asaas_webhook_token_1234567890123456}
-      ASAAS_TIMEOUT_MS: ${ASAAS_TIMEOUT_MS:-8000}
+      # Asaas vem do env_file para preservar o $ da chave sem interpolação do Compose.
       # Admin UI
       ADMIN_UI_USER: ${ADMIN_UI_USER:-admin}
       ADMIN_UI_PASSWORD: ${ADMIN_UI_PASSWORD:-zelo_admin_1234567890123456}

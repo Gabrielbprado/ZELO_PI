@@ -69,7 +69,7 @@ export default function WalletScreen() {
             <Text style={{ color: c.onPrimary, fontSize: 36, fontWeight: '800', letterSpacing: -0.5, marginTop: 4 }}>
               {formatCents(balance)}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.18)' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.chartTrack }}>
               <Lock size={12} color={c.onPrimarySec} />
               <Text style={{ color: c.onPrimarySec, fontSize: 12 }}>
                 Em garantia (escrow): {formatCents(pending)}

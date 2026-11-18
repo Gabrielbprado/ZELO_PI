@@ -5,6 +5,7 @@
  */
 import {
   createCustomer,
+  updateCustomer,
   createPixPayment,
   createCardPayment,
   getPayment,
@@ -44,6 +45,25 @@ describe('createCustomer', () => {
   it('5xx → null', async () => {
     global.fetch = jest.fn().mockResolvedValue(jsonResponse('erro', 500)) as unknown as typeof fetch;
     await expect(createCustomer({ name: 'Ana', email: 'ana@x.com' })).resolves.toBeNull();
+  });
+});
+
+describe('updateCustomer', () => {
+  it('envia o CPF para atualizar o cliente existente no Asaas', async () => {
+    const spy = jest.fn().mockResolvedValue(jsonResponse({ id: 'cus_123' }));
+    global.fetch = spy as unknown as typeof fetch;
+
+    await expect(updateCustomer('cus_123', { cpfCnpj: '52998224725' })).resolves.toBe(true);
+
+    const [url, init] = spy.mock.calls[0];
+    expect(String(url)).toContain('/customers/cus_123');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body as string)).toEqual({ cpfCnpj: '52998224725' });
+  });
+
+  it('retorna false se o Asaas rejeitar a atualização', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ errors: [] }, 400)) as unknown as typeof fetch;
+    await expect(updateCustomer('cus_123', { cpfCnpj: '52998224725' })).resolves.toBe(false);
   });
 });
 

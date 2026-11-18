@@ -22,6 +22,7 @@ export default function EditProfileScreen() {
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [city, setCity] = useState(user?.city ?? '');
   const [neighborhood, setNeighborhood] = useState(user?.neighborhood ?? '');
+  const [cpf, setCpf] = useState(user?.cpf ?? '');
   const [avatarHue, setAvatarHue] = useState(user?.avatarHue ?? 220);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +40,7 @@ export default function EditProfileScreen() {
         phone: phone.trim() || undefined,
         city: city.trim() || undefined,
         neighborhood: neighborhood.trim() || undefined,
+        cpf: cpf.replace(/\D/g, '') || undefined,
         avatarHue,
       });
       setUser(updated);
@@ -77,6 +79,17 @@ export default function EditProfileScreen() {
 
           <Input label="Nome completo" value={name} onChangeText={setName} autoCapitalize="words" />
           <Input label="Telefone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+55 11 ..." />
+          <Input
+            label="CPF (necessário para PIX e cartão)"
+            value={cpf}
+            onChangeText={(value) => setCpf(value.replace(/\D/g, '').slice(0, 11))}
+            keyboardType="number-pad"
+            maxLength={11}
+            placeholder="Digite os 11 números do CPF"
+          />
+          <Text style={{ color: theme.colors.textTer, fontSize: 12 }}>
+            O CPF é enviado ao Asaas para identificar o pagador. Ele não aparece no perfil público.
+          </Text>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Input label="Cidade" value={city} onChangeText={setCity} containerStyle={{ flex: 1 }} />
             <Input label="Bairro" value={neighborhood} onChangeText={setNeighborhood} containerStyle={{ flex: 1 }} />

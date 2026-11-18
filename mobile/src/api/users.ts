@@ -7,6 +7,7 @@ export interface UpdateProfileInput {
   city?: string;
   neighborhood?: string;
   avatarHue?: number;
+  cpf?: string;
 }
 
 export async function updateProfile(input: UpdateProfileInput): Promise<User> {

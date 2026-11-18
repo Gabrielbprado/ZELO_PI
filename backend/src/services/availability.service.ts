@@ -8,16 +8,49 @@ import { withCache, invalidatePrefix } from './cache.service';
  * Modelo: uma grade semanal (`ProviderAvailability`, minutos desde a meia-noite) menos os
  * bloqueios pontuais (`ProviderTimeOff`) menos os agendamentos ativos = os horários livres.
  *
- * Simplificação de fuso assumida e documentada: tudo é calculado em UTC. Para o PI, a
- * consistência (mesma régua para agenda, folgas e bookings) importa mais que o offset;
- * evoluir para timezone por profissional é trocar o ponto de referência das contas abaixo.
+ * O horário de atendimento é horário civil de Brasília (America/Sao_Paulo). Datas de
+ * booking/folga continuam como instantes UTC no banco; a conversão acontece ao montar slots.
  */
 
 const MINUTES_IN_DAY = 24 * 60;
 const SLOT_STEP_MINUTES = 60;
 const DEFAULT_SLOT_MINUTES = 60;
 const SLOTS_TTL_SEC = 60;
+const BUSINESS_TIME_ZONE = 'America/Sao_Paulo';
 const ACTIVE_BOOKING_STATUSES = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] as const;
+const businessClock = new Intl.DateTimeFormat('en-CA', {
+  timeZone: BUSINESS_TIME_ZONE,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hourCycle: 'h23',
+});
+
+function nextDateKey(dateKey: string): string {
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Interpreta a data/hora do calendário de Brasília e devolve o instante UTC equivalente. */
+function localDateTimeToUtc(dateKey: string, minuteOfDay: number): Date {
+  const wallClock = new Date(`${dateKey}T00:00:00.000Z`);
+  wallClock.setUTCMinutes(minuteOfDay);
+  const wallClockMs = wallClock.getTime();
+  let instantMs = wallClockMs;
+
+  // Corrige o offset da zona IANA. Repetir cobre também mudanças históricas de DST.
+  for (let i = 0; i < 3; i += 1) {
+    const parts = Object.fromEntries(businessClock.formatToParts(new Date(instantMs)).map((p) => [p.type, p.value]));
+    const formattedAsUtc = Date.UTC(
+      Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+      Number(parts.hour), Number(parts.minute), Number(parts.second),
+    );
+    const next = wallClockMs - (formattedAsUtc - instantMs);
+    if (next === instantMs) break;
+    instantMs = next;
+  }
+  return new Date(instantMs);
+}
 
 export interface AvailabilityRule {
   weekday: number;
@@ -122,11 +155,13 @@ export async function computeSlots(providerId: string, dateStr: string): Promise
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new BadRequestError('Data inválida (use YYYY-MM-DD)');
 
   return withCache(`slots:${providerId}:${dateStr}`, SLOTS_TTL_SEC, async () => {
-    const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
-    if (Number.isNaN(dayStart.getTime())) throw new BadRequestError('Data inválida');
-    const dayStartMs = dayStart.getTime();
-    const dayEndMs = dayStartMs + MINUTES_IN_DAY * 60_000;
-    const weekday = dayStart.getUTCDay();
+    const parsedDate = new Date(`${dateStr}T00:00:00.000Z`);
+    const dayStart = localDateTimeToUtc(dateStr, 0);
+    if (Number.isNaN(dayStart.getTime()) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== dateStr) {
+      throw new BadRequestError('Data inválida');
+    }
+    const dayEnd = localDateTimeToUtc(nextDateKey(dateStr), 0);
+    const weekday = parsedDate.getUTCDay();
 
     const [rules, bookings, timeOffs] = await Promise.all([
       prisma.providerAvailability.findMany({ where: { providerId, weekday } }),
@@ -134,12 +169,12 @@ export async function computeSlots(providerId: string, dateStr: string): Promise
         where: {
           providerId,
           status: { in: [...ACTIVE_BOOKING_STATUSES] },
-          scheduledAt: { gte: dayStart, lt: new Date(dayEndMs) },
+          scheduledAt: { gte: dayStart, lt: dayEnd },
         },
         select: { scheduledAt: true, durationMinutes: true },
       }),
       prisma.providerTimeOff.findMany({
-        where: { providerId, startsAt: { lt: new Date(dayEndMs) }, endsAt: { gt: dayStart } },
+        where: { providerId, startsAt: { lt: dayEnd }, endsAt: { gt: dayStart } },
         select: { startsAt: true, endsAt: true },
       }),
     ]);
@@ -160,8 +195,8 @@ export async function computeSlots(providerId: string, dateStr: string): Promise
     const slots: Slot[] = [];
     for (const rule of rules) {
       for (let m = rule.startMinute; m + DEFAULT_SLOT_MINUTES <= rule.endMinute; m += SLOT_STEP_MINUTES) {
-        const startMs = dayStartMs + m * 60_000;
-        const endMs = startMs + DEFAULT_SLOT_MINUTES * 60_000;
+        const startMs = localDateTimeToUtc(dateStr, m).getTime();
+        const endMs = localDateTimeToUtc(dateStr, m + DEFAULT_SLOT_MINUTES).getTime();
         if (startMs <= now) continue; // não oferece horário no passado
         const overlaps = busy.some(([bs, be]) => startMs < be && endMs > bs);
         if (!overlaps) slots.push({ startsAt: new Date(startMs).toISOString(), endsAt: new Date(endMs).toISOString() });

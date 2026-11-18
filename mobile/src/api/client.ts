@@ -21,13 +21,9 @@ function isSameOriginWeb(): boolean {
 
 /**
  * Resolve the API base URL with the following precedence:
- *   1. `EXPO_PUBLIC_API_BASE_URL` — inlined at build time. Unlike
- *      `extra.apiBaseUrl`, which lives in the committed `app.json` and is
- *      shared by every target, this can be set per build. Accepts a relative
- *      value (`/api/v1`) so a web bundle served by the backend itself talks
- *      to it same-origin — no CORS, and no tunnel interstitial on XHR.
- *   2. `expoConfig.extra.apiBaseUrl` — explicit override per environment.
- *   3. On web served by backend (same origin), use relative path.
+ *   1. `expoConfig.extra.apiBaseUrl` — explicit URL resolved by app.config.js.
+ *   2. `EXPO_PUBLIC_API_BASE_URL` — fallback for static config/test tooling.
+ *   3. On web served by backend (same origin), use relative path if no URL was configured.
  *   4. On web (dev), derive from the current `window.location` so the app talks
  *      to a backend on the same host (works in LAN / tunnel previews).
  *   5. Expo Go / dev-client on a physical device: use Metro's `hostUri`
@@ -38,13 +34,12 @@ function isSameOriginWeb(): boolean {
  *   7. Everything else (iOS simulator, web SSR, tests) → `localhost`.
  */
 function resolveBaseUrl(): string {
-  const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL;
-  if (fromEnv) return fromEnv;
-
   const fromExtra = (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl;
   if (fromExtra) return fromExtra;
 
-  // Se o app web está sendo servido pelo backend (mesma origem), usa path relativo
+  const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (fromEnv) return fromEnv;
+
   if (isSameOriginWeb()) {
     return API_PATH_PREFIX;
   }

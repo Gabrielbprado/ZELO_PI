@@ -1,6 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
 import { API_PATH_PREFIX } from '../constants';
 import { API_BASE_URL, tokenStore } from './client';
+import { postLocation } from './travel';
 
 /** socket.io mount point on the backend (mirrors `REALTIME_PATH` there). */
 const REALTIME_PATH = '/realtime';
@@ -113,14 +114,19 @@ export async function emitLocation(
   recordedAt?: string,
 ): Promise<void> {
   const s = await getRealtimeSocket();
-  s.emit('travel:location:update', {
+  const input = {
     bookingId,
     latitude: lat,
     longitude: lng,
     accuracy: accuracy ?? null,
     speed: speed ?? null,
     recordedAt: recordedAt ?? new Date().toISOString(),
-  });
+  };
+  if (s.connected) {
+    s.emit('travel:location:update', input);
+    return;
+  }
+  await postLocation(bookingId, input);
 }
 
 export async function leaveTracking(bookingId: string): Promise<void> {
