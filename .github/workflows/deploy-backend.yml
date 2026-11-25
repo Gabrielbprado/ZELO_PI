@@ -4,7 +4,7 @@ on:
   push:
     branches: [develop]
     paths:
-      - backend/**
+      - back/**
       - render.yaml
       - .github/workflows/deploy-backend.yml
   workflow_dispatch:
