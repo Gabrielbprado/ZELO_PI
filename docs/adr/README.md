@@ -2,8 +2,7 @@
 
 Registros curtos das decisões de arquitetura do ZELO — contexto, decisão e consequências.
 Vários são **retroativos**: a decisão foi tomada antes do registro, e o material-fonte já
-vivia em prosa nos cabeçalhos de `docker-compose.yml`, `backend/Dockerfile`, `render.yaml`
-e nos docs. Aqui ficam formalizados para a defesa.
+vivia em prosa nos cabeçalhos de `docker-compose.yml`, `backend/Dockerfile` e nos docs. Aqui ficam formalizados para a defesa.
 
 | # | Decisão | Status |
 |---|---|---|

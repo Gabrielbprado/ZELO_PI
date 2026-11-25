@@ -215,8 +215,7 @@ ZELO_PI/
 │
 ├── docs/                   # SETUP · ML · SECURITY · DEPLOYMENT · BRANCHING
 │                           # brand/ (logo, ícones) · screenshots/
-├── .github/workflows/      # CI, SonarCloud, deploys, retreino do modelo
-└── render.yaml             # blueprint de infraestrutura
+└── .github/workflows/      # CI e retreino opcional do modelo
 ```
 
 ---
@@ -271,17 +270,13 @@ Códigos: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`,
 
 ---
 
-## CI/CD e deploy
+## CI
 
 | Pipeline | Gatilho | Alvo |
 |---|---|---|
 | [`ci.yml`](./.github/workflows/ci.yml) | push / PR em `develop` e `main` | Typecheck + testes unitários e **de integração** (backend), tipos + cores + contraste WCAG (mobile), lint + tipos + testes e contrato (ML) |
-| [`sonarcloud.yml`](./.github/workflows/sonarcloud.yml) | push / PR em `develop` e `main` | Análise de qualidade |
-| [`deploy-backend.yml`](./.github/workflows/deploy-backend.yml) | push em `develop` (`backend/**`) | Render |
-| [`deploy-frontend.yml`](./.github/workflows/deploy-frontend.yml) | push em `develop` (`mobile/**`) | Vercel |
 | [`ml-train.yml`](./.github/workflows/ml-train.yml) | segundas 06:00 UTC · manual | Retreino, avaliação com gate e reload do modelo |
 
-Segredos, blueprint e vínculo dos projetos: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
 
 ---
 
@@ -294,7 +289,6 @@ Segredos, blueprint e vínculo dos projetos: [`docs/DEPLOYMENT.md`](./docs/DEPLO
 | [`docs/ML.md`](./docs/ML.md) | Model card: dados, features, avaliação, limites e riscos do recomendador |
 | [`docs/MODERATION.md`](./docs/MODERATION.md) | Denúncias, classificação automática, guarda-corpos do bloqueio pela IA e decisão do admin |
 | [`docs/SECURITY.md`](./docs/SECURITY.md) | Checklist de segurança do backend |
-| [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) | Deploy em Render e Vercel: secrets, blueprint e vínculo dos projetos |
 | [`docs/BRANCHING.md`](./docs/BRANCHING.md) | Estratégia de branches e regras de proteção |
 | [`docs/brand/BRAND-KIT.md`](./docs/brand/BRAND-KIT.md) | Logo, paleta, tipografia e ícones |
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Commits convencionais, fluxo de review |

@@ -4,8 +4,8 @@
 -- `location geography(Point, 4326)` column, preserving any existing coordinates,
 -- and adds a GiST index so ST_DWithin / nearest-neighbour ordering stays fast.
 
--- 1. Enable PostGIS (no-op if already installed). Requires superuser/`rds_superuser`
---    on the target database — see docs/DEPLOYMENT.md for the Render note.
+-- 1. Enable PostGIS (no-op if already installed). Requires an account with
+--    permission to create the extension on the target database.
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- 2. Add the new geography column (nullable while we backfill).
