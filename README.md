@@ -28,7 +28,7 @@
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [API](#api)
-- [CI/CD e deploy](#cicd-e-deploy)
+- [CI](#ci)
 - [Documentação](#documentação)
 
 ---
@@ -88,43 +88,49 @@ Frontend web (Expo) ──HTTP/WebSocket──▶ API (Express) ──▶ Postgr
 
 ## Rodar o projeto
 
-### Um comando: API + frontend local
+### Windows: API + frontend com um comando
 
-Pré-requisitos: Node.js 20+, Docker em execução e Git. O `npm start` inicia o Postgres/PostGIS pelo Docker, aplica as migrações, carrega dados de demonstração apenas se o banco estiver vazio e inicia a API e o frontend web.
+Este é o caminho recomendado. Instale o **Node.js 20 LTS** e o **Docker Desktop**; abra o Docker Desktop e aguarde o status “Running”. Depois, abra o PowerShell na pasta do projeto.
 
-Na primeira vez, instale as dependências e crie o arquivo de configuração:
+Na primeira execução, crie a configuração e instale as dependências:
 
-```bash
-cp .env.example .env
+```powershell
+Copy-Item .env.example .env
 npm install
 npm install --prefix backend
 npm install --prefix mobile
 ```
 
-No PowerShell, use `Copy-Item .env.example .env` no lugar de `cp`. Depois, para iniciar tudo:
+Para iniciar o PostgreSQL/PostGIS, aplicar migrações, preencher um banco vazio com os dados de demonstração e abrir a API e o frontend:
 
-```bash
+```powershell
 npm start
 ```
 
-Abra **<http://localhost:8081>** para o frontend. A API fica em **<http://localhost:4000>**. Para parar os processos, pressione `Ctrl+C`; o banco continua ligado e preserva os dados. As contas de demonstração usam a senha `Senha@123` (`marina@zero.dev`, cliente; `carlos@zero.dev`, prestador).
+Abra **<http://localhost:8081>** para o frontend. A API fica em **<http://localhost:4000>**. Para parar os processos, pressione `Ctrl+C` no PowerShell; o banco continua ligado e preserva os dados. As contas de demonstração usam a senha `Senha@123` (`marina@zero.dev`, cliente; `carlos@zero.dev`, prestador).
 
-### Tudo em contêineres Docker
+### Windows: projeto inteiro em contêineres
 
-Com Docker Desktop ou Docker Engine + Compose instalado, copie o exemplo de configuração e rode:
+Com Docker Desktop aberto, rode no PowerShell:
 
-```bash
-cp .env.example .env
+```powershell
+Copy-Item .env.example .env
 docker compose up --build
 ```
 
-No PowerShell, use `Copy-Item .env.example .env`. O app web e a API ficam em **<http://localhost:4000>**. O Compose sobe PostgreSQL/PostGIS, compila o frontend e inicia a API. O banco fica exposto em `localhost:55432`.
+O app web e a API ficam em **<http://localhost:4000>**. O Compose sobe PostgreSQL/PostGIS, compila o frontend e inicia a API. O banco fica exposto em `localhost:55432`.
 
 O mesmo fluxo pode ser iniciado por `npm run start:docker` (e encerrado com `npm run stop:docker`). Para apagar também os dados do banco, use `docker compose down -v`.
 
-### ML opcional
+### ML opcional no Windows
 
-O serviço de recomendação fica desligado por padrão. Para iniciá-lo, altere `ML_ENABLED=true` no `.env` e execute `docker compose --profile ml up --build -d ml`. Reinicie a API depois de alterar o `.env` para ela carregar a configuração.
+O serviço de recomendação fica desligado por padrão. Altere `ML_ENABLED=true` no arquivo `.env` e inicie o serviço pelo PowerShell:
+
+```powershell
+docker compose --profile ml up --build -d ml
+```
+
+Reinicie a API para ela carregar a configuração.
 
 Detalhes adicionais: **[docs/DOCKER.md](./docs/DOCKER.md)** e **[docs/SETUP.md](./docs/SETUP.md)**.
 
@@ -132,24 +138,27 @@ Detalhes adicionais: **[docs/DOCKER.md](./docs/DOCKER.md)** e **[docs/SETUP.md](
 
 ## Testes
 
-```bash
-# Backend — unitários (não precisam de banco)
-cd backend && npm run test:unit
+```powershell
+# Backend — testes unitários
+Set-Location backend
+npm run test:unit
 
-# Backend — integração (precisa do banco de testes migrado)
-cd backend
-DATABASE_URL=$TEST_DATABASE_URL npx prisma migrate deploy
-npm run test:integration
+# Backend — preparar e executar integração (requer Docker Desktop e .env configurado)
+..\node_modules\.bin\dotenv.cmd -e ..\.env -v "DATABASE_URL=postgresql://postgres:postgres@localhost:55432/zero_marketplace_test?schema=public" -- npx prisma migrate deploy
+..\node_modules\.bin\dotenv.cmd -e ..\.env -- npm run test:integration
 
-# Backend — tudo
+# Backend — todas as suítes
 npm test
 
-# Mobile — typecheck
-cd mobile && npm run typecheck
+# Mobile — verificação de tipos
+Set-Location ..\mobile
+npm run typecheck
 
-# ML — lint, tipos e testes
-cd ml
-.venv/bin/ruff check . && .venv/bin/mypy src && .venv/bin/pytest -q
+# ML — depois de criar o ambiente Python no Windows
+Set-Location ..\ml
+.\.venv\Scripts\ruff.exe check .
+.\.venv\Scripts\mypy.exe src
+.\.venv\Scripts\pytest.exe -q
 ```
 
 > Os testes de integração truncam todas as tabelas entre as suítes — **não rode
@@ -291,18 +300,6 @@ Códigos: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`,
 | [`docs/SECURITY.md`](./docs/SECURITY.md) | Checklist de segurança do backend |
 | [`docs/BRANCHING.md`](./docs/BRANCHING.md) | Estratégia de branches e regras de proteção |
 | [`docs/brand/BRAND-KIT.md`](./docs/brand/BRAND-KIT.md) | Logo, paleta, tipografia e ícones |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Commits convencionais, fluxo de review |
-
----
-
-## Contribuindo
-
-Pull requests são bem-vindos. Leia o [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-antes de abrir um: branches saem de `develop`, commits seguem Conventional
-Commits e todo PR precisa de ao menos uma aprovação.
-
-Encontrou uma vulnerabilidade? Veja o [`SECURITY.md`](./SECURITY.md) — por
-favor, não abra issue pública para relatos sensíveis.
 
 ---
 
