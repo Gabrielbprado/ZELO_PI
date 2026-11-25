@@ -60,7 +60,7 @@ export default function EditProfileScreen() {
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 16 }}>
+        <ScrollView contentContainerStyle={{ width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 40, gap: 16 }}>
           <View style={{ alignItems: 'center', paddingVertical: 12 }}>
             <Avatar name={name || '?'} size={80} hue={avatarHue} />
             <Text style={{ color: theme.colors.textSec, fontSize: 11, marginTop: 8 }}>Toque numa cor para mudar</Text>

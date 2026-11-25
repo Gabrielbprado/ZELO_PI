@@ -16,13 +16,13 @@ export function ScreenContainer({ children, scroll = true, edges = ['top', 'bott
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       {scroll ? (
         <ScrollView
-          contentContainerStyle={[{ paddingBottom: 32 }, contentStyle]}
+          contentContainerStyle={[{ width: '100%', maxWidth: 760, alignSelf: 'center', paddingBottom: 32 }, contentStyle]}
           showsVerticalScrollIndicator={false}
         >
           {children}
         </ScrollView>
       ) : (
-        <View style={[{ flex: 1 }, contentStyle]}>{children}</View>
+        <View style={[{ flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center' }, contentStyle]}>{children}</View>
       )}
     </SafeAreaView>
   );

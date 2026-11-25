@@ -44,7 +44,7 @@ export default function ForgotPasswordScreen() {
         <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>Esqueci minha senha</Text>
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, paddingHorizontal: 20 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, width: '100%', maxWidth: 600, alignSelf: 'center', paddingHorizontal: 20 }}>
         {sent ? (
           <View style={{ flex: 1, paddingTop: 32, alignItems: 'center' }}>
             <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.successBg, alignItems: 'center', justifyContent: 'center' }}>

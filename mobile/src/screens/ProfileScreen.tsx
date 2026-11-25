@@ -60,11 +60,11 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
+      <View style={{ width: '100%', maxWidth: 840, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
         <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '800' }}>Perfil</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, gap: 16, paddingBottom: 32 }}>
+      <ScrollView contentContainerStyle={{ width: '100%', maxWidth: 840, alignSelf: 'center', paddingHorizontal: 20, gap: 16, paddingBottom: 32 }}>
         <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 16, borderWidth: 1, borderColor: theme.colors.hairline, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <Avatar name={user?.name ?? '?'} size={64} hue={user?.avatarHue ?? 220} />
           <View style={{ flex: 1 }}>

@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { ProCard } from '../components/ProCard';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import * as providersApi from '../api/providers';
 import type { Provider } from '../types';
 import type { AppStackParamList } from '../navigation/types';
@@ -23,6 +24,7 @@ export default function ProviderListScreen() {
   const category = route.params?.category;
   const initialQ = route.params?.q ?? '';
   const { theme } = useTheme();
+  const { isWide } = useResponsiveLayout();
 
   const [active, setActive] = useState<'rating' | 'price' | 'distance' | 'verified'>('rating');
   const [pros, setPros] = useState<Provider[]>([]);
@@ -97,11 +99,16 @@ export default function ProviderListScreen() {
         </View>
       ) : (
         <FlatList
+          key={isWide ? 'provider-grid' : 'provider-list'}
           data={pros}
+          numColumns={isWide ? 2 : 1}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 8 }}
+          columnWrapperStyle={isWide ? { gap: 12 } : undefined}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 12, width: '100%', maxWidth: 1280, alignSelf: 'center' }}
           renderItem={({ item }) => (
-            <ProCard pro={item} onPress={() => nav.navigate('ProviderProfile', { providerId: item.id })} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ProCard pro={item} onPress={() => nav.navigate('ProviderProfile', { providerId: item.id })} />
+            </View>
           )}
         />
       )}

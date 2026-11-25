@@ -75,7 +75,7 @@ export default function ProviderDashboardScreen() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ width: '100%', maxWidth: 1280, alignSelf: 'center', paddingBottom: 32 }}
         refreshControl={<RefreshControl tintColor={theme.colors.primary} refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
         <View style={{ backgroundColor: theme.colors.headerGradient, paddingBottom: 20 }}>

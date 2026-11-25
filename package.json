@@ -1,0 +1,16 @@
+{
+  "name": "zelo-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Comandos de desenvolvimento para o ZELO",
+  "scripts": {
+    "prestart": "dotenv -e .env -- node scripts/prepare-local.cjs",
+    "start": "dotenv -e .env -- concurrently --kill-others -n API,WEB -c blue,green \"npm --prefix backend run dev\" \"npm --prefix mobile run web\"",
+    "start:docker": "docker compose up --build",
+    "stop:docker": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "dotenv-cli": "^10.0.0"
+  }
+}

@@ -67,7 +67,7 @@ export default function RegisterScreen() {
 
   return (
     <ScreenContainer scroll contentStyle={{ paddingHorizontal: 20, paddingBottom: 48 }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', maxWidth: 560, alignSelf: 'center' }}>
         <Pressable onPress={() => nav.goBack()} style={{ width: 40, height: 40, marginTop: 8 }}>
           <ArrowLeft color={theme.colors.text} size={22} />
         </Pressable>

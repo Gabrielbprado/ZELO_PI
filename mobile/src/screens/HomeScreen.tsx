@@ -14,6 +14,7 @@ import { ForYouCarousel } from '../components/ForYouCarousel';
 import { HomeTutorial } from '../components/HomeTutorial';
 import { useAuth } from '../contexts/AuthContext';
 import { useHomeOnboarding } from '../hooks/useHomeOnboarding';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import * as providersApi from '../api/providers';
 import type { Category, Provider } from '../types';
 import type { AppStackParamList } from '../navigation/types';
@@ -21,6 +22,7 @@ import type { AppStackParamList } from '../navigation/types';
 export default function HomeScreen() {
   const nav = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { theme, mode } = useTheme();
+  const { isDesktop, isWide } = useResponsiveLayout();
   const { user } = useAuth();
   const { status: onboardingStatus, markSeen } = useHomeOnboarding();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -53,7 +55,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ width: '100%', maxWidth: 1320, alignSelf: 'center', paddingBottom: 32 }}
         refreshControl={<RefreshControl tintColor={theme.colors.primary} refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
@@ -112,7 +114,7 @@ export default function HomeScreen() {
           <Text
             style={{
               color: theme.colors.text,
-              fontSize: 32,
+              fontSize: isDesktop ? 40 : 32,
               fontWeight: '700',
               letterSpacing: -1.2,
               lineHeight: 38,
@@ -234,8 +236,8 @@ export default function HomeScreen() {
                 key={c.id}
                 onPress={() => nav.navigate('ProviderList', { category: c })}
                 style={({ pressed }) => ({
-                  width: '23.5%',
-                  aspectRatio: 0.92,
+                  width: isWide ? '15%' : '23.5%',
+                  aspectRatio: isDesktop ? 1.28 : 0.92,
                   borderRadius: 14,
                   backgroundColor: theme.colors.surface,
                   alignItems: 'center',
@@ -298,7 +300,7 @@ export default function HomeScreen() {
               <Pressable
                 key={p.id}
                 onPress={() => nav.navigate('ProviderProfile', { providerId: p.id })}
-                style={{ width: 168, padding: 16, borderRadius: 16, backgroundColor: theme.colors.surface }}
+                style={{ width: isWide ? 228 : 168, padding: 16, borderRadius: 16, backgroundColor: theme.colors.surface }}
               >
                 <Avatar name={p.name} size={48} hue={p.avatarHue} />
                 <Text

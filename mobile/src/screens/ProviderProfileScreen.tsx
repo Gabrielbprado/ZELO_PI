@@ -32,7 +32,7 @@ export default function ProviderProfileScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ width: '100%', maxWidth: 1180, alignSelf: 'center', paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={{ height: 260, backgroundColor: heroBg(pro.avatarHue, mode) }}>
           <SafeAreaView edges={['top']} style={{ paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', justifyContent: 'space-between' }}>

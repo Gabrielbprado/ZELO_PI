@@ -56,7 +56,7 @@ export default function ChangePasswordScreen() {
         <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>Alterar senha</Text>
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, paddingHorizontal: 20 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, width: '100%', maxWidth: 600, alignSelf: 'center', paddingHorizontal: 20 }}>
         <View style={{ gap: 14, marginTop: 8 }}>
           <Input label="Senha atual" value={current} onChangeText={setCurrent} secureTextEntry />
           <Input label="Nova senha" value={next} onChangeText={setNext} secureTextEntry />

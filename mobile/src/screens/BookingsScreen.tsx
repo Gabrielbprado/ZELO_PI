@@ -10,6 +10,7 @@ import { SkeletonList } from '../components/Skeleton';
 import { Avatar } from '../components/Avatar';
 import { Badge } from '../components/Badge';
 import { useAuth } from '../contexts/AuthContext';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import * as bookingsApi from '../api/bookings';
 import type { Booking, BookingStatus } from '../types';
 import type { AppStackParamList } from '../navigation/types';
@@ -35,6 +36,7 @@ const statusLabel: Record<BookingStatus, string> = {
 export default function BookingsScreen() {
   const nav = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { theme } = useTheme();
+  const { isWide } = useResponsiveLayout();
   const { user } = useAuth();
   const [items, setItems] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,9 +77,12 @@ export default function BookingsScreen() {
         />
       ) : (
         <FlatList
+          key={isWide ? 'booking-grid' : 'booking-list'}
           data={items}
+          numColumns={isWide ? 2 : 1}
           keyExtractor={(b) => b.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 10 }}
+          columnWrapperStyle={isWide ? { gap: 12 } : undefined}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 12, width: '100%', maxWidth: 1280, alignSelf: 'center' }}
           refreshControl={<RefreshControl tintColor={theme.colors.primary} refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => {
             const other =
@@ -88,6 +93,8 @@ export default function BookingsScreen() {
               <Pressable
                 onPress={() => nav.navigate('BookingDetail', { bookingId: item.id })}
                 style={({ pressed }) => ({
+                  flex: 1,
+                  minWidth: 0,
                   backgroundColor: theme.colors.surface,
                   borderRadius: theme.radius.lg,
                   padding: 14,

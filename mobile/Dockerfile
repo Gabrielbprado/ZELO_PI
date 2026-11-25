@@ -24,7 +24,7 @@ ENV EXPO_PUBLIC_API_BASE_URL=$EXPO_PUBLIC_API_BASE_URL
 RUN npm run build:web
 
 
-FROM node:20-slim AS export
+FROM alpine:3.21 AS export
 
 WORKDIR /app
 COPY --from=build /app/dist ./dist

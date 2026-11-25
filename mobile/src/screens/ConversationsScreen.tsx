@@ -9,12 +9,14 @@ import { EmptyState } from '../components/EmptyState';
 import { SkeletonList } from '../components/Skeleton';
 import { Avatar } from '../components/Avatar';
 import { Badge } from '../components/Badge';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import * as messagesApi from '../api/messages';
 import type { AppStackParamList } from '../navigation/types';
 
 export default function ConversationsScreen() {
   const nav = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { theme } = useTheme();
+  const { isWide } = useResponsiveLayout();
   const [items, setItems] = useState<messagesApi.Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,15 +48,20 @@ export default function ConversationsScreen() {
         />
       ) : (
         <FlatList
+          key={isWide ? 'conversation-grid' : 'conversation-list'}
           data={items}
+          numColumns={isWide ? 2 : 1}
           keyExtractor={(c) => c.user?.id ?? Math.random().toString()}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 8 }}
+          columnWrapperStyle={isWide ? { gap: 12 } : undefined}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 12, width: '100%', maxWidth: 1280, alignSelf: 'center' }}
           refreshControl={<RefreshControl tintColor={theme.colors.primary} refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
           renderItem={({ item }) =>
             !item.user ? null : (
               <Pressable
                 onPress={() => nav.navigate('Chat', { otherUserId: item.user!.id, otherName: item.user!.name, otherHue: item.user!.avatarHue })}
                 style={({ pressed }) => ({
+                  flex: 1,
+                  minWidth: 0,
                   flexDirection: 'row', alignItems: 'center', gap: 12,
                   padding: 12, borderRadius: theme.radius.md,
                   backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.hairline,

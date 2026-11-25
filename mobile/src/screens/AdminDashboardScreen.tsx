@@ -54,7 +54,7 @@ export default function AdminDashboardScreen() {
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={c.primary} /></View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+        <ScrollView contentContainerStyle={{ width: '100%', maxWidth: 1120, alignSelf: 'center', padding: 16, gap: 16 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             <Card Icon={TrendingUp} label="GMV (pago)" value={brl(overview?.gmv ?? 0)} hint={`${overview?.paidCount ?? 0} pagamentos`} />
             <Card Icon={Percent} label="Comissão retida" value={brlCents(overview?.commissionCents ?? 0)} />

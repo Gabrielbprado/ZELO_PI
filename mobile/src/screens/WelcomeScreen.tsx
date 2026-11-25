@@ -12,7 +12,7 @@ export default function WelcomeScreen() {
 
   return (
     <ScreenContainer scroll={false} contentStyle={{ paddingHorizontal: 28, paddingVertical: 32 }}>
-      <View style={{ flex: 1, justifyContent: 'space-between' }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', justifyContent: 'space-between' }}>
         {/* Brand mark — wordmark, not a generic icon-in-a-square */}
         <View style={{ marginTop: 64 }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>

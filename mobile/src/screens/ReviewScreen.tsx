@@ -48,7 +48,7 @@ export default function ReviewScreen() {
         <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>Avaliar serviço</Text>
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, paddingHorizontal: 20 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20 }}>
         <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '800', marginTop: 16 }}>
           Avalie {params.providerName}
         </Text>

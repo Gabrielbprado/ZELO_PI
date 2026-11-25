@@ -42,7 +42,7 @@ export default function LoginScreen() {
 
   return (
     <ScreenContainer scroll contentStyle={{ paddingHorizontal: 28 }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', maxWidth: 480, alignSelf: 'center' }}>
         <Pressable onPress={() => nav.goBack()} style={{ width: 44, height: 44, marginTop: 8, justifyContent: 'center' }}>
           <ArrowLeft color={theme.colors.text} size={24} />
         </Pressable>

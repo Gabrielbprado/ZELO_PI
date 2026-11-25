@@ -23,9 +23,7 @@
 - [O que é](#o-que-é)
 - [Telas](#telas)
 - [Arquitetura](#arquitetura)
-- [Rodar com Docker](#rodar-com-docker) ← **caminho mais curto**
-- [Rodar sem Docker](#rodar-sem-docker)
-- [Cache e resiliência (Redis)](#cache-e-resiliência-redis)
+- [Rodar o projeto](#rodar-o-projeto) — `npm start` ou Docker
 - [Testes](#testes)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Estrutura do repositório](#estrutura-do-repositório)
@@ -74,304 +72,61 @@ TypeScript, app React Native e serviço de recomendação em Python.
 
 ## Arquitetura
 
-Plataforma distribuída: API + gateway, um **microserviço** de notificações extraído
-(schema-per-service), **RabbitMQ** como barramento de eventos com **outbox transacional**,
-**Redis** para cache/rate limit/breaker, o serviço de **ML**, e observabilidade
-(Prometheus + Grafana). Diagramas Mermaid (contexto C4, sequência de `payment.confirmed`,
-topologia AMQP) e o detalhamento em **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+A versão básica usa o frontend Expo, uma API Node.js e PostgreSQL com PostGIS. O serviço de recomendação em Python é opcional; sem ele, a API mantém o ranking padrão.
 
-```
-        📱 Mobile (Expo/RN)
-          │ HTTPS (JWT) · WebSocket
-┌─────────▼───────────────────────────────────────────────┐
-│  Backend — Node/Express                                  │
-│  API · gateway · WebSocket · domínio · outbox · relay    │
-└──┬────────┬──────────────┬───────────────┬───────────────┘
-   │ cache  │ AMQP publish  │ HTTP /rank    │ HTTP /internal
-┌──▼───┐  ┌─▼──────────┐    │            ┌──▼───────────────┐
-│Redis │  │ RabbitMQ   │    │            │ Notificações     │
-│(opc.)│  │ zelo.events│──notifications.q─▶ (Node · inbox ·  │
-└──────┘  └─┬──────────┘    │            │  push · schema   │
-            │ analytics.q   │            │  notifications)  │
-        ┌───▼──────────┐ ┌──▼─────────┐  └──────┬───────────┘
-        │ consumidor   │ │ ML         │         │
-        │ analytics    │ │ (FastAPI)  │         │
-        └──────────────┘ └────────────┘         │
-   ┌──────────────────────────────────────────────────────┐
-   │  PostgreSQL + PostGIS                                 │
-   │  schema public (backend)  ·  schema notifications     │
-   └──────────────────────────────────────────────────────┘
-   observabilidade: Prometheus + Grafana (profile obs)
+```text
+Frontend web (Expo) ──HTTP/WebSocket──▶ API (Express) ──▶ PostgreSQL + PostGIS
+                                               └──────▶ ML opcional (FastAPI)
 ```
 
-Tudo o que é infra é **degradável**: Redis, RabbitMQ, ML e o serviço de notificações fora
-do ar viram degradações nomeadas (cache passthrough, outbox represado, ranking por nota,
-inbox vazio), nunca uma queda. Decisões formalizadas em **[docs/adr/](docs/adr/README.md)**.
-
-| Camada | Tecnologias |
+| Parte | Tecnologias |
 |---|---|
-| Mobile | React Native 0.81, Expo 54, React Navigation v7, Axios, socket.io-client, Lucide, `expo-secure-store`, `expo-notifications` |
-| Backend | Node.js 20+, Express 4, TypeScript 5, Prisma 5, Zod, Pino, Socket.IO 4 |
-| Notificações | Node 20, Express, Prisma (schema `notifications`), amqplib — consome eventos, persiste o inbox, envia push |
-| ML | Python 3.12, FastAPI, scikit-learn, NumPy, SciPy (sem pandas em produção) |
-| Banco | PostgreSQL 16 **com PostGIS** — schemas `public` e `notifications` |
-| Cache | Redis 7 — **opcional**: cache de leitura, rate limit entre instâncias e estado do circuit breaker |
-| Mensageria | RabbitMQ 3 — **opcional**: barramento `zelo.events` (topic), outbox transacional, DLQ + retry |
-| Observabilidade | `prom-client` (Node) + `prometheus-fastapi-instrumentator` (Python), Prometheus + Grafana (profile `obs`), correlation id ponta a ponta |
-| Segurança | bcryptjs, JWT (access + refresh rotativo), Helmet, allow-list de CORS, `express-rate-limit`, `hpp`, tokens de serviço (`X-ML-Token`, `X-SERVICE-TOKEN`) |
-| Testes | Jest + Supertest (backend + serviço, unit + integração com broker real), pytest (ML) |
+| Frontend | React Native, Expo, React Navigation |
+| Backend | Node.js, Express, TypeScript, Prisma, Socket.IO |
+| Banco | PostgreSQL com PostGIS |
+| ML opcional | Python, FastAPI, scikit-learn, NumPy, SciPy |
 
----
+## Rodar o projeto
 
-## Rodar com Docker (recomendado)
+### Um comando: API + frontend local
 
-Um único comando sobe **tudo**: PostgreSQL + PostGIS (com os schemas `public` e
-`notifications`), Redis, RabbitMQ, o microserviço de notificações, a API já **migrada e
-populada com o seed**, e o app web servido pela própria API. Só é preciso ter o Docker
-instalado.
+Pré-requisitos: Node.js 20+, Docker em execução e Git. O `npm start` inicia o Postgres/PostGIS pelo Docker, aplica as migrações, carrega dados de demonstração apenas se o banco estiver vazio e inicia a API e o frontend web.
 
-### 1. Instale o Docker
-
-- **Windows** → [Docker Desktop](https://www.docker.com/products/docker-desktop/) (inclui o
-  Docker Compose). Abra o Docker Desktop e espere ficar "Running".
-- **Linux** → Docker Engine + plugin Compose:
-  ```bash
-  curl -fsSL https://get.docker.com | sh
-  sudo usermod -aG docker $USER   # e reabra o terminal
-  ```
-
-### 2. Baixe o projeto e suba
-
-O comando é **o mesmo nos dois sistemas**. Abra o terminal (no Windows, PowerShell ou o
-terminal do Docker Desktop) na pasta do projeto:
+Na primeira vez, instale as dependências e crie o arquivo de configuração:
 
 ```bash
-git clone https://github.com/Gabrielbprado/ZELO_PI.git
-cd ZELO_PI
+cp .env.example .env
+npm install
+npm install --prefix backend
+npm install --prefix mobile
+```
+
+No PowerShell, use `Copy-Item .env.example .env` no lugar de `cp`. Depois, para iniciar tudo:
+
+```bash
+npm start
+```
+
+Abra **<http://localhost:8081>** para o frontend. A API fica em **<http://localhost:4000>**. Para parar os processos, pressione `Ctrl+C`; o banco continua ligado e preserva os dados. As contas de demonstração usam a senha `Senha@123` (`marina@zero.dev`, cliente; `carlos@zero.dev`, prestador).
+
+### Tudo em contêineres Docker
+
+Com Docker Desktop ou Docker Engine + Compose instalado, copie o exemplo de configuração e rode:
+
+```bash
+cp .env.example .env
 docker compose up --build
 ```
 
-Na primeira vez leva alguns minutos (baixa as imagens e compila). Quando aparecer
-`ZERO API rodando`, abra:
+No PowerShell, use `Copy-Item .env.example .env`. O app web e a API ficam em **<http://localhost:4000>**. O Compose sobe PostgreSQL/PostGIS, compila o frontend e inicia a API. O banco fica exposto em `localhost:55432`.
 
-**<http://localhost:4000>** — e entre com **`marina@zero.dev`** / **`Senha@123`** (cliente).
-Para ver o **painel administrativo** (GMV, funil), entre como **`admin@zelo.dev`** / **`Senha@123`**.
+O mesmo fluxo pode ser iniciado por `npm run start:docker` (e encerrado com `npm run stop:docker`). Para apagar também os dados do banco, use `docker compose down -v`.
 
-Para parar: `Ctrl+C`. Para subir em segundo plano: `docker compose up --build -d`; para
-derrubar tudo: `docker compose down` (ou `docker compose down -v` para apagar também o
-banco e recomeçar do zero).
+### ML opcional
 
-### O que fica disponível
+O serviço de recomendação fica desligado por padrão. Para iniciá-lo, altere `ML_ENABLED=true` no `.env` e execute `docker compose --profile ml up --build -d ml`. Reinicie a API depois de alterar o `.env` para ela carregar a configuração.
 
-| Serviço | Endereço |
-|---|---|
-| App web + API | <http://localhost:4000> |
-| Health check | <http://localhost:4000/api/v1/health/ready> |
-| Métricas (Prometheus) | <http://localhost:4000/metrics> |
-| Filas (Bull Board) | <http://localhost:4000/admin/queues> — Basic auth `admin` / `zelo-admin` |
-| RabbitMQ (UI das filas) | <http://localhost:15672> — `guest` / `guest` |
-| PostgreSQL | `localhost:55432` — `postgres` / `postgres` |
-| Redis | `localhost:56379` |
-
-### Extras opcionais
-
-```bash
-# Recomendação por ML (sobe o ranker em :8001) + treino do modelo
-docker compose --profile ml up --build
-docker compose exec backend npm run prisma:seed:ml -- --verify
-docker compose --profile train run --rm ml-train
-
-# Observabilidade: Prometheus (:9090) + Grafana (:3000, painel já provisionado)
-docker compose --profile obs up
-```
-
-Comandos do dia a dia, controle do seed (`SEED_ON_START`), testes dentro do
-contêiner e solução de problemas: **[`docs/DOCKER.md`](./docs/DOCKER.md)**.
-
-> As imagens copiam o código na build, sem recarga automática. Para desenvolver com
-> hot-reload, use a instalação nativa abaixo.
-
----
-
-## Rodar sem Docker
-
-### Pré-requisitos
-
-| Ferramenta | Versão | Observação |
-|---|---|---|
-| Node.js | 20 LTS ou 22 (veja `.nvmrc`) | obrigatório |
-| PostgreSQL | 14, 15 ou 16 **com PostGIS** | obrigatório |
-| Python | **3.12** (3.11 serve) | só para o serviço de ML — opcional |
-| Expo Go | última | só para rodar em celular físico |
-
-> **Python 3.13/3.14 não.** As wheels de `scipy`/`scikit-learn` demoram a sair
-> para versões muito novas e o `pip` cai num build a partir do código-fonte que
-> costuma falhar.
-
-### 1. Banco de dados (PostgreSQL + PostGIS)
-
-O casamento por proximidade e a âncora geográfica do recomendador usam
-**PostGIS** — o Postgres puro não serve, a migração `postgis_location` roda
-`CREATE EXTENSION postgis`.
-
-**Com Docker (caminho mais curto):**
-
-```bash
-docker run -d --name zelo-postgis -p 5432:5432 \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=zero_marketplace \
-  postgis/postgis:16-3.4
-
-# banco de testes de integração
-docker exec zelo-postgis psql -U postgres -c "CREATE DATABASE zero_marketplace_test;"
-```
-
-**Instalação nativa:** instale o pacote PostGIS da sua distribuição
-(`postgresql-16-postgis-3` no Debian/Ubuntu, `brew install postgis` no macOS,
-*Stack Builder* no Windows) e crie os dois bancos. O passo a passo por sistema
-operacional está em [`docs/SETUP.md`](./docs/SETUP.md#2-postgresql-sem-docker).
-
-### 2. Backend (API)
-
-```bash
-cd backend
-cp .env.example .env
-```
-
-Preencha no `.env`:
-
-```bash
-# gere DOIS segredos diferentes, de 32+ caracteres cada
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-```
-
-```ini
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/zero_marketplace?schema=public"
-TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/zero_marketplace_test?schema=public"
-JWT_ACCESS_SECRET="<primeiro segredo>"
-JWT_REFRESH_SECRET="<segundo segredo>"
-```
-
-```bash
-npm install
-npm run prisma:generate
-npm run prisma:migrate     # cria tabelas + habilita PostGIS
-npm run prisma:seed        # categorias e profissionais de exemplo
-npm run dev                # http://localhost:4000
-```
-
-Verifique: `curl http://localhost:4000/api/v1/health` → `{"status":"ok",...}`.
-
-**Contas criadas pelo seed** (senha `Senha@123` para todas):
-`marina@zero.dev` (cliente) · `carlos@zero.dev`, `ana@zero.dev`,
-`roberto@zero.dev`, `julia@zero.dev`, `pedro@zero.dev`, `lucia@zero.dev`
-(prestadores). São contas de desenvolvimento — não suba isso para produção.
-
-### 3. App mobile
-
-```bash
-cd mobile
-npm install
-npm run web        # navegador — http://localhost:8081
-# ou: npm run android | npm run ios | npm start
-```
-
-Sem configuração extra o app descobre a API sozinho: `localhost:4000` no
-navegador e no simulador iOS, `10.0.2.2:4000` no emulador Android.
-
-**Celular físico:** rode `npm run start:lan`, leia o QR-code no Expo Go e aponte
-o app para o IP da sua máquina na LAN — `EXPO_PUBLIC_API_BASE_URL` no ambiente
-ou `expo.extra.apiBaseUrl` no `app.json`:
-
-```bash
-EXPO_PUBLIC_API_BASE_URL="http://192.168.0.123:4000/api/v1" npm run start:lan
-```
-
-### 4. Serviço de ML (opcional)
-
-**Pode pular.** Sem ele o carrossel "Para você" continua funcionando: a resposta
-volta com `strategy: "fallback"` e a lista ordenada por avaliação. Para ligar:
-
-```bash
-cd ml
-python3.12 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pip install -e .
-```
-
-O seed padrão tem 6 profissionais e nenhum agendamento — não há o que treinar.
-Use o seed sintético (**destrutivo: apaga os dados do banco apontado por
-`DATABASE_URL`**):
-
-```bash
-cd backend && npm run prisma:seed:ml -- --verify   # ~200 clientes, 60 pros, ~3000 bookings
-```
-
-```bash
-cd ml
-ML_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/zero_marketplace" \
-  .venv/bin/python -m zelo_ml.training.train --activate
-```
-
-O relatório de avaliação sai em `ml/reports/eval-<versão>.md`. Se o modelo não
-superar a ordenação atual do app por uma margem mínima, o artefato é gravado
-como **inativo** — um modelo pior nunca chega ao usuário em silêncio.
-
-### Rodando tudo (3 terminais)
-
-```bash
-cd backend && npm run dev                                             # :4000
-cd ml && .venv/bin/uvicorn zelo_ml.api.main:app --reload --port 8001  # :8001
-cd mobile && npm start                                                # :8081
-```
-
-`curl localhost:8001/health` deve mostrar `"strategy": "ranker"` depois do
-treino (e `"heuristic_fallback"` antes dele).
-
-> Problemas para subir? A seção de
-> [troubleshooting do `docs/SETUP.md`](./docs/SETUP.md#8-troubleshooting) cobre
-> os erros mais comuns (segredo curto demais, Postgres fora do ar, CORS no web,
-> celular sem alcançar a LAN, `pip` compilando scipy).
-
----
-
-## Cache e resiliência (Redis)
-
-O Redis entra como **dependência opcional** e cobre três papéis:
-
-| Papel | O que resolve |
-|---|---|
-| Cache de leitura | Categorias, detalhe do profissional, listagens e avaliações. A listagem sai de ~16 ms para ~2 ms. |
-| Rate limit distribuído | Com o store em memória, duas instâncias contam janelas separadas e o limite efetivo **dobra** — um furo no `authLimiter`, que existe para conter força bruta. |
-| Circuit breaker do ML | O estado era por processo, então cada instância pagava o timeout do serviço de ML por conta própria antes de proteger o próprio tráfego. |
-
-**Opcional é para valer.** Com `REDIS_ENABLED=false`, ou com o Redis fora do ar, a API
-funciona igual — mais lenta nas listagens e com o limite contado por processo. Isso é
-verificado por teste, e dá para conferir à mão:
-
-```bash
-docker compose stop redis
-curl -s localhost:4000/api/v1/providers -o /dev/null -w '%{http_code} em %{time_total}s\n'
-curl -s localhost:4000/api/v1/health/ready   # → "degraded", com HTTP 200
-docker compose start redis                   # volta a cachear sozinho, sem reiniciar a API
-```
-
-Três decisões que sustentam isso:
-
-- `enableOfflineQueue: false` no cliente de cache. Com o padrão (`true`), o ioredis
-  enfileira comandos em memória enquanto está desconectado e cada requisição fica
-  pendurada até o timeout — trocaria "sem cache" por "API travada".
-- `passOnStoreError: true` nos limitadores. Um contador indisponível libera a
-  requisição em vez de devolver 500: rejeitar todo o tráfego porque o Redis caiu seria
-  um apagão auto-infligido.
-- O store do rate limit é construído **sob demanda**. O `rate-limit-redis` dispara
-  `SCRIPT LOAD` dentro do construtor, no import do módulo, sem aguardar a promessa — com
-  o Redis fora, essa rejeição derrubava o processo em loop de restart.
-
-Health checks: `/api/v1/health` é liveness e não toca em dependência alguma (é o que o
-Render e o Docker consultam); `/api/v1/health/ready` consulta tudo e só devolve 503
-quando o **Postgres** cai — Redis ou ML fora produzem `degraded` com HTTP 200, porque o
-sistema de fato continua servindo.
+Detalhes adicionais: **[docs/DOCKER.md](./docs/DOCKER.md)** e **[docs/SETUP.md](./docs/SETUP.md)**.
 
 ---
 
@@ -404,7 +159,7 @@ cd ml
 
 ## Variáveis de ambiente
 
-O `backend/.env.example` é a referência completa. As essenciais:
+O [`.env.example`](./.env.example) da raiz serve para `npm start` e Docker; o `backend/.env.example` contém opções adicionais da API. As essenciais:
 
 | Variável | Obrigatória | Padrão | Descrição |
 |---|---|---|---|
@@ -416,13 +171,10 @@ O `backend/.env.example` é a referência completa. As essenciais:
 | `CORS_ORIGINS` | não | `http://localhost:8081` | allow-list separada por vírgula |
 | `WEB_DIST_DIR` | não | — | serve o bundle web do Expo pela própria API |
 | `PUSH_ENABLED` | não | `true` | notificações push via Expo |
-| `ML_ENABLED` | não | `true` | `false` desliga a chamada ao serviço de ML |
+| `ML_ENABLED` | não | `false` no exemplo da raiz | `true` ativa a chamada ao serviço opcional de ML |
 | `ML_SERVICE_URL` | não | — | ex.: `http://localhost:8001` |
 | `ML_SERVICE_TOKEN` | condicional | — | obrigatório quando `ML_SERVICE_URL` está definida |
 | `ML_TIMEOUT_MS` | não | `700` | acima disso, degrada para ordenação por nota |
-| `REDIS_ENABLED` | não | `false` | `true` liga cache, rate limit distribuído e breaker compartilhado |
-| `REDIS_URL` | condicional | — | obrigatória quando `REDIS_ENABLED=true` |
-| `REDIS_KEY_PREFIX` | não | `zelo` | isola ambientes que dividem a mesma instância |
 
 Detalhes de rate limit, bcrypt e das variáveis do serviço Python:
 [`docs/SETUP.md`](./docs/SETUP.md#6-variáveis-de-ambiente).
@@ -538,7 +290,7 @@ Segredos, blueprint e vínculo dos projetos: [`docs/DEPLOYMENT.md`](./docs/DEPLO
 | Documento | Conteúdo |
 |---|---|
 | [`docs/SETUP.md`](./docs/SETUP.md) | Instalação detalhada por sistema operacional, testes, troubleshooting |
-| [`docs/DOCKER.md`](./docs/DOCKER.md) | Ambiente completo em contêineres: seed automático, perfis de ML, treino |
+| [`docs/DOCKER.md`](./docs/DOCKER.md) | Execução básica com Docker, seed automático e ML opcional |
 | [`docs/ML.md`](./docs/ML.md) | Model card: dados, features, avaliação, limites e riscos do recomendador |
 | [`docs/MODERATION.md`](./docs/MODERATION.md) | Denúncias, classificação automática, guarda-corpos do bloqueio pela IA e decisão do admin |
 | [`docs/SECURITY.md`](./docs/SECURITY.md) | Checklist de segurança do backend |

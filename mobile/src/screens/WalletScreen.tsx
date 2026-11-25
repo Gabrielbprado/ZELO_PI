@@ -49,7 +49,7 @@ export default function WalletScreen() {
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={c.primary} /></View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+        <ScrollView contentContainerStyle={{ width: '100%', maxWidth: 960, alignSelf: 'center', padding: 16, gap: 16 }}>
           <View style={{ backgroundColor: c.primaryDeep, borderRadius: 18, padding: 20 }}>
             <Text style={{ color: c.onPrimarySec, fontSize: 12, fontWeight: '600' }}>DISPONÍVEL PARA SAQUE</Text>
             <Text style={{ color: c.onPrimary, fontSize: 36, fontWeight: '800', marginTop: 4 }}>

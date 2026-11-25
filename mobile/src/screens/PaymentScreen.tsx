@@ -111,7 +111,7 @@ export default function PaymentScreen() {
         <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>Pagamento</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, gap: 20 }}>
+      <ScrollView contentContainerStyle={{ width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, gap: 20 }}>
         <View style={{ alignItems: 'center', paddingVertical: 24, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.hairline }}>
           <Text style={{ color: theme.colors.textSec, fontSize: 12 }}>Total a pagar</Text>
           <Text style={{ color: theme.colors.text, fontSize: 44, fontWeight: '800', letterSpacing: -1, marginTop: 4 }}>R$ {params.amount}</Text>

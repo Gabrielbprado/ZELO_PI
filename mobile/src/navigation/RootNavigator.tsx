@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { Home as IconHome, Calendar, MessageSquare, User } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -47,20 +48,44 @@ const Tabs      = createBottomTabNavigator<RootTabParamList>();
 function TabsNavigator() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { isDesktop } = useResponsiveLayout();
   const isProvider = user?.role === 'PROVIDER';
   return (
     <Tabs.Navigator
+      tabBarPosition={isDesktop ? 'left' : 'bottom'}
       screenOptions={{
         headerShown: false,
+        tabBarVariant: isDesktop ? 'material' : 'uikit',
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
+          borderTopWidth: isDesktop ? 0 : 1,
           borderTopColor: theme.colors.hairline,
-          height: 64,
-          paddingBottom: 8,
+          borderRightWidth: isDesktop ? 1 : 0,
+          borderRightColor: theme.colors.hairline,
+          width: isDesktop ? 248 : undefined,
+          height: isDesktop ? '100%' : 68,
+          paddingTop: isDesktop ? 28 : 4,
+          paddingBottom: isDesktop ? 24 : 8,
+          paddingHorizontal: isDesktop ? 12 : 0,
+          elevation: 0,
         },
         tabBarActiveTintColor: theme.colors.primaryText,
         tabBarInactiveTintColor: theme.colors.textSec,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelPosition: isDesktop ? 'beside-icon' : 'below-icon',
+        tabBarLabelStyle: {
+          fontSize: isDesktop ? 14 : 11,
+          fontWeight: '600',
+          textAlign: 'left',
+          flex: isDesktop ? 1 : undefined,
+        },
+        tabBarItemStyle: {
+          minHeight: isDesktop ? 48 : undefined,
+          borderRadius: isDesktop ? 12 : undefined,
+          marginBottom: isDesktop ? 6 : 0,
+          paddingHorizontal: isDesktop ? 12 : 0,
+          justifyContent: isDesktop ? 'flex-start' : 'center',
+        },
+        tabBarIconStyle: { marginRight: isDesktop ? 12 : 0 },
       }}
     >
       <Tabs.Screen
@@ -90,6 +115,7 @@ function TabsNavigator() {
 export function RootNavigator() {
   const { isAuthenticated, loading } = useAuth();
   const { theme } = useTheme();
+  const webSceneStyle = { backgroundColor: theme.colors.bg, width: '100%' as const, maxWidth: 1440, alignSelf: 'center' as const };
 
   if (loading) {
     return (
@@ -101,7 +127,7 @@ export function RootNavigator() {
 
   if (!isAuthenticated) {
     return (
-      <AuthStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bg } }}>
+      <AuthStack.Navigator screenOptions={{ headerShown: false, contentStyle: webSceneStyle }}>
         <AuthStack.Screen name="Welcome" component={WelcomeScreen} />
         <AuthStack.Screen name="Login" component={LoginScreen} />
         <AuthStack.Screen name="Register" component={RegisterScreen} />
@@ -112,7 +138,7 @@ export function RootNavigator() {
   }
 
   return (
-    <AppStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bg } }}>
+    <AppStack.Navigator screenOptions={{ headerShown: false, contentStyle: webSceneStyle }}>
       <AppStack.Screen name="Tabs" component={TabsNavigator} />
       <AppStack.Screen name="ProviderList" component={ProviderListScreen} />
       <AppStack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
