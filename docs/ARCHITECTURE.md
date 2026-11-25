@@ -103,12 +103,3 @@ flowchart LR
 Retry **por consumidor** (não global): um `booking.created` que falha em `notifications`
 não reprocessa em `analytics`, que já teve sucesso. Detalhes e o *caveat* de entrega em
 [EVENTS.md](EVENTS.md).
-
-## Observabilidade
-
-`prom-client` no backend e no serviço de notificações, `prometheus-fastapi-instrumentator`
-no ML — todos expõem `/metrics`. Além das métricas de HTTP, as de **negócio**:
-`events_published_total`, `events_consumed_total`, `event_processing_duration_seconds`,
-`outbox_pending`, `ml_circuit_state`, `cache_hits_total`, `notifications_persisted_total`,
-`push_sent_total`. `docker compose --profile obs up` sobe Prometheus (`:9090`) e Grafana
-(`:3000`) com um painel provisionado (`docker/observability/`).

@@ -75,7 +75,6 @@ The following are enforced server-side on both `develop` and `main`:
 - ⚡ **Auto-merge is enabled** — queue a PR to merge as soon as checks pass.
 - 🆙 **"Update branch" button is enabled** — bring your PR up to date
   without leaving GitHub.
-- 🤝 **CODEOWNERS** auto-assigns reviewers (see `.github/CODEOWNERS`).
 
 ---
 

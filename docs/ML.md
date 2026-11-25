@@ -186,7 +186,7 @@ cd ml && ML_DATABASE_URL=... .venv/bin/python -m zelo_ml.training.train --activa
 python -m zelo_ml.training.train --backend db --activate --fail-under
 ```
 
-Retreino: `.github/workflows/ml-train.yml`, segundas 06:00 UTC. Semanal é a
+O retreino pode ser executado manualmente com o comando acima. Semanal é a
 cadência honesta para o volume atual; com telemetria real acumulando em
 `RecEvent`, migrar para diário.
 

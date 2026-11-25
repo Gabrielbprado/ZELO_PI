@@ -222,9 +222,14 @@ ZELO_PI/
 │   ├── contracts/          # JSON Schema do contrato Node ↔ Python
 │   └── tests/
 │
-├── docs/                   # SETUP · ML · SECURITY · DEPLOYMENT · BRANCHING
+├── docs/                   # instruções, referências, marca e capturas de tela
 │                           # brand/ (logo, ícones) · screenshots/
-└── .github/workflows/      # CI e retreino opcional do modelo
+├── docker/                 # SQL que cria o banco usado nos testes
+├── scripts/                # preparação automática para npm start
+├── .github/workflows/      # CI
+├── docker-compose.yml      # backend, frontend, banco e ML opcional
+├── package.json            # comandos npm start e Docker
+└── .env.example            # configuração inicial
 ```
 
 ---
@@ -284,7 +289,6 @@ Códigos: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`,
 | Pipeline | Gatilho | Alvo |
 |---|---|---|
 | [`ci.yml`](./.github/workflows/ci.yml) | push / PR em `develop` e `main` | Typecheck + testes unitários e **de integração** (backend), tipos + cores + contraste WCAG (mobile), lint + tipos + testes e contrato (ML) |
-| [`ml-train.yml`](./.github/workflows/ml-train.yml) | segundas 06:00 UTC · manual | Retreino, avaliação com gate e reload do modelo |
 
 
 ---

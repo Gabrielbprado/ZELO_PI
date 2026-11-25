@@ -22,6 +22,9 @@ if (!npmCli) {
   process.exit(1);
 }
 
+console.log('› removendo containers antigos deste projeto (preserva os volumes)...');
+run('docker', ['compose', 'down', '--remove-orphans']);
+
 console.log('› iniciando PostgreSQL/PostGIS pelo Docker Compose...');
 run('docker', ['compose', 'up', '-d', '--wait', 'db']);
 
