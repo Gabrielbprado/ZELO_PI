@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300" viewBox="0 0 900 300" role="img" aria-labelledby="title desc">
+  <title id="title">Identificar a versão do PostgreSQL</title>
+  <desc id="desc">Abra o terminal, execute psql --version e anote o número principal da versão.</desc>
+  <rect width="900" height="300" rx="24" fill="#f4f6f8"/>
+  <text x="40" y="52" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#17212b">1. Confira a versão instalada</text>
+  <rect x="40" y="78" width="820" height="176" rx="14" fill="#17212b"/>
+  <circle cx="67" cy="104" r="6" fill="#ef6a63"/><circle cx="88" cy="104" r="6" fill="#f2c14e"/><circle cx="109" cy="104" r="6" fill="#55b878"/>
+  <text x="70" y="157" font-family="monospace" font-size="20" fill="#b6c5d3">PS C:\projeto&gt;</text>
+  <text x="270" y="157" font-family="monospace" font-size="20" fill="#ffffff">psql --version</text>
+  <text x="70" y="199" font-family="monospace" font-size="18" fill="#91d5a8">psql (PostgreSQL) 16.4</text>
+  <rect x="583" y="177" width="202" height="46" rx="10" fill="#dff5e6"/>
+  <text x="602" y="207" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#17643a">Anote: versão 16</text>
+</svg>

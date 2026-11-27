@@ -139,7 +139,8 @@ export function RootNavigator() {
 
   return (
     <AppStack.Navigator screenOptions={{ headerShown: false, contentStyle: webSceneStyle }}>
-      <AppStack.Screen name="Tabs" component={TabsNavigator} />
+      {/* Keep a meaningful page title on web when the authenticated root mounts. */}
+      <AppStack.Screen name="Tabs" component={TabsNavigator} options={{ title: 'Zelo' }} />
       <AppStack.Screen name="ProviderList" component={ProviderListScreen} />
       <AppStack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
       <AppStack.Screen name="Booking" component={BookingScreen} />

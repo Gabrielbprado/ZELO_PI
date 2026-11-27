@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="340" viewBox="0 0 900 340" role="img" aria-labelledby="title desc">
+  <title id="title">Baixar o PostGIS compatível</title>
+  <desc id="desc">Na página oficial de downloads, escolha o instalador PostGIS para a mesma versão principal do PostgreSQL.</desc>
+  <rect width="900" height="340" rx="24" fill="#f4f6f8"/>
+  <text x="40" y="52" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#17212b">2. Escolha o pacote da mesma versão</text>
+  <rect x="40" y="78" width="820" height="220" rx="14" fill="#ffffff" stroke="#d7dee5" stroke-width="2"/>
+  <rect x="40" y="78" width="820" height="50" rx="14" fill="#eaf0f5"/>
+  <text x="72" y="111" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#334454">PostgreSQL instalado</text>
+  <text x="383" y="111" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#334454">Pacote PostGIS</text>
+  <text x="680" y="111" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#334454">Ação</text>
+  <rect x="58" y="148" width="784" height="55" rx="9" fill="#f8fafb"/>
+  <text x="91" y="183" font-family="Arial,sans-serif" font-size="19" fill="#17212b">PostgreSQL 16</text>
+  <text x="421" y="183" font-family="Arial,sans-serif" font-size="19" fill="#17212b">PostGIS para 16</text>
+  <rect x="682" y="158" width="137" height="36" rx="8" fill="#176b52"/>
+  <text x="708" y="182" font-family="Arial,sans-serif" font-size="16" font-weight="700" fill="#ffffff">Baixar .exe</text>
+  <path d="M230 226h410" stroke="#cbd5df" stroke-width="2" stroke-dasharray="6 7"/>
+  <text x="86" y="267" font-family="Arial,sans-serif" font-size="16" fill="#536475">Use apenas downloads da página oficial PostGIS / OSGeo.</text>
+</svg>

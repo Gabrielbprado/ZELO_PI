@@ -23,7 +23,8 @@
 - [O que é](#o-que-é)
 - [Telas](#telas)
 - [Arquitetura](#arquitetura)
-- [Rodar o projeto](#rodar-o-projeto) — `npm start` ou Docker
+- [Rodar o projeto](#rodar-o-projeto) — com ou sem Docker
+- [Instalar PostGIS no PostgreSQL já instalado](#instalar-postgis-no-postgresql-já-instalado)
 - [Testes](#testes)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Estrutura do repositório](#estrutura-do-repositório)
@@ -88,9 +89,18 @@ Frontend web (Expo) ──HTTP/WebSocket──▶ API (Express) ──▶ Postgr
 
 ## Rodar o projeto
 
+### Requisitos
+
+| Modo | Requisitos |
+|---|---|
+| **Com Docker** | Git, Docker Desktop (Windows/macOS) ou Docker Engine + Docker Compose v2 (Linux), com o Docker iniciado. O banco PostGIS, API e frontend são iniciados pelos contêineres. |
+| **Sem Docker** | Git, Node.js 20 LTS ou 22, npm 10+, PostgreSQL 14–16 com PostGIS instalado, e acesso ao terminal. O PostgreSQL deve estar iniciado. |
+
+O serviço Python de recomendação é opcional nos dois modos. Para desenvolver o app em um simulador, instale também Android Studio (Android) ou Xcode (iOS, somente macOS). Para abrir no navegador, não precisa instalar esses simuladores.
+
 ### Windows: API + frontend sem Docker
 
-Instale o **Node.js 20 LTS** e o **PostgreSQL com PostGIS** (o PostGIS é necessário pelas migrações). Depois, abra o PowerShell na pasta do projeto. O `.env.example` usa PostgreSQL local na porta `5432`; ajuste `DATABASE_URL` e `TEST_DATABASE_URL` em `.env` para a senha e os bancos da sua instalação.
+Instale o **Node.js 20 LTS ou 22** e o **PostgreSQL com PostGIS** (a extensão é obrigatória pelas migrações). Se já tiver PostgreSQL sem PostGIS, siga o [tutorial visual abaixo](#instalar-postgis-no-postgresql-já-instalado). Depois, abra o PowerShell na pasta do projeto. O `.env.example` usa PostgreSQL local na porta `5432`; ajuste `DATABASE_URL` e `TEST_DATABASE_URL` em `.env` para a senha e os bancos da sua instalação.
 
 Na primeira execução, crie a configuração e instale as dependências:
 
@@ -111,18 +121,51 @@ Abra **<http://localhost:8081>** para o frontend. A API fica em **<http://localh
 
 `npm start` não inicia nem para containers. Ele usa o PostgreSQL/PostGIS que já estiver instalado e rodando na máquina.
 
-### Windows: projeto inteiro em contêineres
+### Com Docker: projeto inteiro em contêineres
 
-Com Docker Desktop aberto, rode no PowerShell:
+Com Docker iniciado, rode na pasta do projeto (PowerShell no Windows ou terminal no macOS/Linux):
 
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build
 ```
 
-O app web e a API ficam em **<http://localhost:4000>**. O Compose sobe PostgreSQL/PostGIS, compila o frontend e inicia a API. O banco fica exposto em `localhost:55432`.
+O app web e a API ficam em **<http://localhost:4000>**. O Compose baixa a imagem `postgis/postgis`, compila o frontend, prepara o banco e inicia a API. Não é necessário instalar Node.js ou PostgreSQL/PostGIS na máquina para este modo. O banco fica exposto em `localhost:55432`.
 
 O mesmo fluxo pode ser iniciado por `npm run start:docker` (e encerrado com `npm run stop:docker`). Para apagar também os dados do banco, use `docker compose down -v`.
+
+### Instalar PostGIS no PostgreSQL já instalado
+
+O projeto precisa da extensão **PostGIS** para as migrações e recursos geográficos. Ter o servidor PostgreSQL instalado não significa que o PostGIS também esteja instalado. No Windows, instale uma versão do PostGIS que corresponda à versão principal do seu PostgreSQL (por exemplo, PostgreSQL 16 → instalador PostGIS para PostgreSQL 16).
+
+#### 1. Confira a versão do PostgreSQL
+
+No PowerShell, execute `psql --version` ou abra o **SQL Shell (psql)** e rode `SELECT version();`. Anote o número principal, como `16`.
+
+![Exemplo ilustrado de como identificar a versão do PostgreSQL](docs/postgis/01-versao.svg)
+
+#### 2. Baixe o instalador PostGIS compatível
+
+Abra a [página oficial de instaladores PostGIS para Windows](https://postgis.net/documentation/getting_started/install_windows/released_versions/) e baixe o instalador da mesma versão principal do seu PostgreSQL. Os instaladores dessa página são para PostgreSQL 64-bit distribuído pelo EnterpriseDB. Como alternativa, procure **Stack Builder** no menu Iniciar, selecione sua instalação do PostgreSQL, expanda **Spatial Extensions** e escolha PostGIS.
+
+![Exemplo ilustrado da seleção de um instalador PostGIS compatível](docs/postgis/02-download.svg)
+
+Execute o instalador baixado e siga as etapas. Se o assistente pedir os dados do servidor, use `localhost`, a porta configurada no PostgreSQL (normalmente `5432`), o usuário `postgres` e a senha definida ao instalar o banco. Se não encontrar seu PostgreSQL na lista ou a versão não estiver disponível, use o [tutorial oficial do PostGIS](https://postgis.net/documentation/getting_started/install_windows/) para escolher o pacote correto; não misture instaladores de versões principais diferentes.
+
+#### 3. Habilite e confira a extensão
+
+No pgAdmin, conecte-se ao banco `zero_marketplace`, abra **Tools → Query Tool** e execute:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS postgis;
+SELECT PostGIS_Version();
+```
+
+Repita no banco `zero_marketplace_test` se for executar os testes de integração. Se preferir o terminal, rode o mesmo SQL com `psql -U postgres -d zero_marketplace -c "CREATE EXTENSION IF NOT EXISTS postgis;"`. Depois disso, siga os passos de instalação sem Docker acima.
+
+![Exemplo ilustrado para habilitar e conferir PostGIS no banco](docs/postgis/03-habilitar.svg)
+
+As imagens são esquemas explicativos da sequência, não capturas reais do instalador. As telas podem variar conforme a versão. No macOS/Linux, consulte os comandos de instalação nativa em [`docs/SETUP.md`](./docs/SETUP.md#2-postgresql-sem-docker); ou use Docker para não instalar PostGIS no sistema.
 
 ### ML opcional no Windows
 
