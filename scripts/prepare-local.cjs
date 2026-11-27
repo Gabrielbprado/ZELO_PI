@@ -22,13 +22,7 @@ if (!npmCli) {
   process.exit(1);
 }
 
-console.log('› removendo containers antigos deste projeto (preserva os volumes)...');
-run('docker', ['compose', 'down', '--remove-orphans']);
-
-console.log('› iniciando PostgreSQL/PostGIS pelo Docker Compose...');
-run('docker', ['compose', 'up', '-d', '--wait', 'db']);
-
-console.log('› preparando banco e Prisma...');
+console.log('› preparando banco PostgreSQL local e Prisma...');
 run(process.execPath, [npmCli, 'run', 'prisma:generate'], { cwd: backend });
 run(process.execPath, [npmCli, 'run', 'prisma:deploy'], { cwd: backend });
 

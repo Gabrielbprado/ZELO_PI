@@ -88,9 +88,9 @@ Frontend web (Expo) ──HTTP/WebSocket──▶ API (Express) ──▶ Postgr
 
 ## Rodar o projeto
 
-### Windows: API + frontend com um comando
+### Windows: API + frontend sem Docker
 
-Este é o caminho recomendado. Instale o **Node.js 20 LTS** e o **Docker Desktop**; abra o Docker Desktop e aguarde o status “Running”. Depois, abra o PowerShell na pasta do projeto.
+Instale o **Node.js 20 LTS** e o **PostgreSQL com PostGIS** (o PostGIS é necessário pelas migrações). Depois, abra o PowerShell na pasta do projeto. O `.env.example` usa PostgreSQL local na porta `5432`; ajuste `DATABASE_URL` e `TEST_DATABASE_URL` em `.env` para a senha e os bancos da sua instalação.
 
 Na primeira execução, crie a configuração e instale as dependências:
 
@@ -101,13 +101,15 @@ npm install --prefix backend
 npm install --prefix mobile
 ```
 
-Para iniciar o PostgreSQL/PostGIS, aplicar migrações, preencher um banco vazio com os dados de demonstração e abrir a API e o frontend:
+Crie os bancos `zero_marketplace` e `zero_marketplace_test` no PostgreSQL local. Então, para aplicar migrações, preencher um banco vazio com os dados de demonstração e abrir a API e o frontend:
 
 ```powershell
 npm start
 ```
 
-Abra **<http://localhost:8081>** para o frontend. A API fica em **<http://localhost:4000>**. Para parar os processos, pressione `Ctrl+C` no PowerShell; o banco continua ligado e preserva os dados. As contas de demonstração usam a senha `Senha@123` (`marina@zero.dev`, cliente; `carlos@zero.dev`, prestador).
+Abra **<http://localhost:8081>** para o frontend. A API fica em **<http://localhost:4000>**. Para parar os processos, pressione `Ctrl+C` no PowerShell; o PostgreSQL continua ligado e preserva os dados. As contas de demonstração usam a senha `Senha@123` (`marina@zero.dev`, cliente; `carlos@zero.dev`, prestador).
+
+`npm start` não inicia nem para containers. Ele usa o PostgreSQL/PostGIS que já estiver instalado e rodando na máquina.
 
 ### Windows: projeto inteiro em contêineres
 
