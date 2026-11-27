@@ -52,9 +52,11 @@ function TabsNavigator() {
   const isProvider = user?.role === 'PROVIDER';
   return (
     <Tabs.Navigator
-      tabBarPosition={isDesktop ? 'left' : 'bottom'}
       screenOptions={{
         headerShown: false,
+        // These are screen options in React Navigation v7; passing the
+        // position directly to Tabs.Navigator leaves it at the default bottom.
+        tabBarPosition: isDesktop ? 'left' : 'bottom',
         tabBarVariant: isDesktop ? 'material' : 'uikit',
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
